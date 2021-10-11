@@ -1,94 +1,70 @@
 import numpy as np
 import torch
-from transformers import BertTokenizer, BertForMaskedLM, BertModel
-import matplotlib.pyplot as plt
 import pickle
 import torch.nn.functional as F
 import argparse
+import json
+import csv
+from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel
+import pandas as pd
+
+def CalcPrediction(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
+    outputs_correct, outputs_incorrect, token_ids, choice_tokens_list, masked_sents_list = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context)
+    if 'bert' in args.model:
+        tokens_list = choice_tokens_list
+    elif 'gpt2' in args.model:
+        tokens_list = masked_sents_list
+    return EvaluatePredictions(outputs_correct[0],outputs_incorrect[0],token_ids,tokens_list,args)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type = str, required = True)
+    parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
+    parser.add_argument('--stimuli', type = str,
+                        choices=['original','control_gender','control_number','control_combined'],
+                        default='original')
+    parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
+    parser.add_argument('--core_id', type = int, default=0)
     args = parser.parse_args()
+    print(f'running with {args}')
 
-    model = BertForMaskedLM.from_pretrained(args.model,output_hidden_states=True,output_attentions=True)
-    tokenizer = BertTokenizer.from_pretrained(args.model)
-    model.eval()
-    mask_id = tokenizer.encode("[MASK]")[1:-1][0]
+    head,text = LoadDataset(args)
+    model, tokenizer, mask_id, args = LoadModel(args)
 
-    with open('datafile/wsc_data_new.pkl','rb') as f:
-        wsc_data = pickle.load(f)
-
-    schema_id = 0
     out_dict = {}
-    for key,value in wsc_data.items():
-        assert len(value)==2
-        print(value)
-        sent_1 = value[0]['sent']
-        sent_2 = value[1]['sent']
-        print('sentences:')
-        print(sent_1)
-        print(sent_2)
-        input_1 = tokenizer(sent_1,return_tensors='pt')['input_ids']
-        input_2 = tokenizer(sent_2,return_tensors='pt')['input_ids']
-        print('input_tensors:')
-        print(input_1)
-        print(input_2)
+    for line in text:
+        choice_probs_sum_1, choice_probs_ave_1 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args)
+        choice_probs_sum_2, choice_probs_ave_2 = CalcPrediction(head,line,2,model,tokenizer,mask_id,args)
+        choice_probs_sum_3, choice_probs_ave_3 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args,mask_context=True)
 
-        pron_1 = value[0]['pron']
-        pron_2 = value[1]['pron']
-        assert pron_1==pron_2
-        pron_token = tokenizer(pron_1)['input_ids'][1:-1]
-        print(f'pronoun: {pron_1} as {pron_token}')
-        assert len(pron_token)==1
-        assert np.sum([token==pron_token[0] for token in input_1[0]])==1
-        assert np.sum([token==pron_token[0] for token in input_2[0]])==1
-        pron_id_1 = list(input_1[0]).index(pron_token[0])
-        pron_id_2 = list(input_2[0]).index(pron_token[0])
+        out_dict[line[head.index('pair_id')]] = {}
+        out_dict[line[head.index('pair_id')]]['sum_1'] = choice_probs_sum_1
+        out_dict[line[head.index('pair_id')]]['sum_2'] = choice_probs_sum_2
+        out_dict[line[head.index('pair_id')]]['sum_3'] = choice_probs_sum_3
 
-        masked_sent_1 = input_1.clone()
-        masked_sent_2 = input_2.clone()
-        masked_sent_1[0][pron_id_1] = mask_id
-        masked_sent_2[0][pron_id_2] = mask_id
-        print(masked_sent_1)
-        print(masked_sent_2)
-        print([tokenizer.decode([token]) for token in masked_sent_1[0]])
-        print([tokenizer.decode([token]) for token in masked_sent_2[0]])
+        out_dict[line[head.index('pair_id')]]['ave_1'] = choice_probs_ave_1
+        out_dict[line[head.index('pair_id')]]['ave_2'] = choice_probs_ave_2
+        out_dict[line[head.index('pair_id')]]['ave_3'] = choice_probs_ave_3
 
-        outputs_1 = model(masked_sent_1)[0]
-        probs_1 = F.log_softmax(outputs_1[:, pron_id_1], dim = -1)
-        outputs_2 = model(masked_sent_2)[0]
-        probs_2 = F.log_softmax(outputs_2[:, pron_id_2], dim = -1)
+    if args.dataset=='superglue':
+        with open(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.pkl','wb') as f:
+            pickle.dump(out_dict,f)
+    elif args.dataset=='winogrande':
+        with open(f'datafile/winogrande_{args.size}_prediction_{args.model}.pkl','wb') as f:
+            pickle.dump(out_dict,f)
 
-
-        choices_1 = value[0]['choices']
-        choices_2 = value[1]['choices']
-        assert choices_1[0]==choices_2[0] and choices_1[1]==choices_2[1]
-        choices = choices_1
-        print('choices')
-        print(choices)
-
-        choice_tokens_list = [tokenizer(choice)['input_ids'][1:-1] for choice in choices]
-        print(choice_tokens_list)
-
-        choice_probs_sum_1 = [np.sum([probs_1[0,token].item() for token in tokens]) for tokens in choice_tokens_list]
-        choice_probs_sum_2 = [np.sum([probs_2[0,token].item() for token in tokens]) for tokens in choice_tokens_list]
-        choice_probs_ave_1 = [np.mean([probs_1[0,token].item() for token in tokens]) for tokens in choice_tokens_list]
-        choice_probs_ave_2 = [np.mean([probs_2[0,token].item() for token in tokens]) for tokens in choice_tokens_list]
-
-        correct_1 = value[0]['correct_ans']
-        correct_2 = value[1]['correct_ans']
-        print(correct_1)
-        print(correct_2)
-
-        correct_id_1 = ['A','B'].index(correct_1)
-        correct_id_2 = ['A','B'].index(correct_2)
-        print(correct_id_1,correct_id_2)
-        out_dict[key] = {}
-        out_dict[key]['sum'] = np.array([[choice_probs_sum_1[correct_id_1],choice_probs_sum_1[correct_id_2]],
-        [choice_probs_sum_2[correct_id_2],choice_probs_sum_2[correct_id_1]]])
-        out_dict[key]['ave'] = np.array([[choice_probs_ave_1[correct_id_1],choice_probs_ave_1[correct_id_2]],
-        [choice_probs_ave_2[correct_id_2],choice_probs_ave_2[correct_id_1]]])
-
-    with open(f'datafile/wsc_prediction_{args.model}.pkl','wb') as f:
-        pickle.dump(out_dict,f)
+    data_list = []
+    for line in text:
+        pair_id = line[head.index('pair_id')]
+        pred_data = out_dict[pair_id]
+        data_list.append(line+[pred_data['sum_1'][0]-pred_data['sum_1'][1],
+                               pred_data['sum_2'][0]-pred_data['sum_2'][1],
+                               pred_data['sum_3'][0]-pred_data['sum_3'][1],
+                               pred_data['ave_1'][0]-pred_data['ave_1'][1],
+                               pred_data['ave_2'][0]-pred_data['ave_2'][1],
+                               pred_data['ave_3'][0]-pred_data['ave_3'][1]])
+    df = pd.DataFrame(data_list,columns=[head+['sum_1','sum_2','sum_3','ave_1','ave_2','ave_3']])
+    if args.dataset=='superglue':
+        df.to_csv(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
+    elif args.dataset=='winogrande':
+        df.to_csv(f'datafile/winogrande_{args.size}_prediction_{args.model}.csv')
