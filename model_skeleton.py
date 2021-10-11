@@ -29,26 +29,35 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
     num_heads = layer.attention.self.num_attention_heads
     head_dim = layer.attention.self.attention_head_size
 
-    #calculate key, query, and value for attention (before doing the interventions)
-    key = layer.attention.self.key(hidden)
-    query = layer.attention.self.query(hidden)
-    value = layer.attention.self.value(hidden)
-
-    # swap representations
-    if f'layer_{layer_id}' in interventions:
+    # if the intervention is layer only, apply the intervention first
+    if f'layer_{layer_id}' in interventions and f'query_{layer_id}' not in interventions:
         for (pos,vec) in interventions[f'layer_{layer_id}']:
             hidden = swap_vecs(hidden,pos,vec,args)
-    #NOTE: this swaps representations for all heads:
-    #when doing intervenstions on each head, engineer the intervenstions accordingly
-    if f'key_{layer_id}' in interventions:
-        for (pos,vec) in interventions[f'key_{layer_id}']:
-            key = swap_vecs(key,pos,vec,args)
-    if f'query_{layer_id}' in interventions:
-        for (pos,vec) in interventions[f'query_{layer_id}']:
-            query = swap_vecs(query,pos,vec,args)
-    if f'value_{layer_id}' in interventions:
-        for (pos,vec) in interventions[f'value_{layer_id}']:
-            value = swap_vecs(value,pos,vec,args)
+        key = layer.attention.self.key(hidden)
+        query = layer.attention.self.query(hidden)
+        value = layer.attention.self.value(hidden)
+
+    # otherwise, calculate key, query, and value for attention first
+    else:
+        key = layer.attention.self.key(hidden)
+        query = layer.attention.self.query(hidden)
+        value = layer.attention.self.value(hidden)
+
+        # swap representations
+        if f'layer_{layer_id}' in interventions:
+            for (pos,vec) in interventions[f'layer_{layer_id}']:
+                hidden = swap_vecs(hidden,pos,vec,args)
+        #NOTE: this swaps representations for all heads:
+        #when doing intervenstions on each head, engineer the intervenstions accordingly
+        if f'key_{layer_id}' in interventions:
+            for (pos,vec) in interventions[f'key_{layer_id}']:
+                key = swap_vecs(key,pos,vec,args)
+        if f'query_{layer_id}' in interventions:
+            for (pos,vec) in interventions[f'query_{layer_id}']:
+                query = swap_vecs(query,pos,vec,args)
+        if f'value_{layer_id}' in interventions:
+            for (pos,vec) in interventions[f'value_{layer_id}']:
+                value = swap_vecs(value,pos,vec,args)
 
     #split into multiple heads
     split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
