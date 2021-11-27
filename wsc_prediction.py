@@ -9,12 +9,12 @@ from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel
 import pandas as pd
 
 def CalcPrediction(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
-    outputs_correct, outputs_incorrect, token_ids, choice_tokens_list, masked_sents_list = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context)
+    outputs, token_ids, option_tokens_list, masked_sents = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context)
     if 'bert' in args.model:
-        tokens_list = choice_tokens_list
+        tokens_list = option_tokens_list
     elif 'gpt2' in args.model:
-        tokens_list = masked_sents_list
-    return EvaluatePredictions(outputs_correct[0],outputs_incorrect[0],token_ids,tokens_list,args)
+        tokens_list = [masked_sent[0] for masked_sent in masked_sents]
+    return EvaluatePredictions(outputs[0][0],outputs[1][0],token_ids,tokens_list,args)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
