@@ -32,7 +32,7 @@ if __name__=='__main__':
     model, tokenizer, mask_id, args = LoadModel(args)
 
     out_dict = {}
-    for line in text:
+    for line in text[:500]:
         choice_probs_sum_1, choice_probs_ave_1 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args)
         choice_probs_sum_2, choice_probs_ave_2 = CalcPrediction(head,line,2,model,tokenizer,mask_id,args)
         choice_probs_sum_3, choice_probs_ave_3 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args,mask_context=True)
@@ -46,15 +46,17 @@ if __name__=='__main__':
         out_dict[line[head.index('pair_id')]]['ave_2'] = choice_probs_ave_2
         out_dict[line[head.index('pair_id')]]['ave_3'] = choice_probs_ave_3
 
+    '''
     if args.dataset=='superglue':
         with open(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     elif args.dataset=='winogrande':
         with open(f'datafile/winogrande_{args.size}_prediction_{args.model}.pkl','wb') as f:
             pickle.dump(out_dict,f)
+    '''
 
     data_list = []
-    for line in text:
+    for line in text[:500]:
         pair_id = line[head.index('pair_id')]
         pred_data = out_dict[pair_id]
         data_list.append(line+[pred_data['sum_1'][0]-pred_data['sum_1'][1],

@@ -4,7 +4,10 @@ def AlignTokens(target_name,model_name,tokenizer,sent,input_sent,word,word_id,ve
     assert target_name in ['pron','choice','context','period']
     if target_name=='period':
         # if you didn't include <|endoftext|> token for gpt2 you need to fix here
-        period_id = len(input_sent[0])-2
+        if 'bert' in model_name:
+            period_id = len(input_sent[0])-2
+        elif 'gpt2' in model_name:
+            period_id = len(input_sent[0])-1
         CheckAlignment(target_name,tokenizer,input_sent,word,period_id,None,verbose)
         return period_id
     else:
@@ -34,12 +37,9 @@ def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose
     assert target_name in ['pron','masks','choice','context','period']
     if target_name=='period':
         recreated_target = tokenizer.decode(input_sent[0][start_id])
-        assert recreated_target in ['.','".','..','$20.'],recreated_target
+        assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target
     else:
         recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
         if verbose:
             print(word,recreated_target)
-        if target_name=='masks':
-            assert recreated_target.strip().lower() in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
-        else:
-            assert recreated_target.strip().lower()==word.strip().lower(), f'check the alignment of {target_name}'
+        assert recreated_target.strip(' ,.').lower() in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'

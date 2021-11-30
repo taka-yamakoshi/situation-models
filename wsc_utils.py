@@ -9,12 +9,12 @@ def LoadDataset(args):
     if args.dataset=='superglue':
         if args.stimuli=='original':
             fname = 'datafile/SuperGLUE_wsc_new.csv'
-        elif args.stimuli=='control_gender':
-            fname = 'datafile/SuperGLUE_wsc_new_control_gender.csv'
-        elif args.stimuli=='control_number':
-            fname = 'datafile/SuperGLUE_wsc_new_control_number.csv'
+        #elif args.stimuli=='control_gender':
+        #    fname = 'datafile/SuperGLUE_wsc_new_control_gender.csv'
+        #elif args.stimuli=='control_number':
+        #    fname = 'datafile/SuperGLUE_wsc_new_control_number.csv'
         elif args.stimuli=='control_combined':
-            fname = 'datafile/SuperGLUE_wsc_new_control_combined.csv'
+            fname = 'datafile/SuperGLUE_wsc_control_combined_new.csv'
     elif args.dataset=='winogrande':
         fname = f'datafile/winogrande_{args.size}.csv'
 
@@ -81,7 +81,7 @@ def LoadModel(args):
 
     return model, tokenizer, mask_id, args
 
-def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
+def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False):
     # load data from a line in csv
     sent = line[head.index(f'sent_{sent_id}')]
     if 'gpt2' in args.model:
@@ -115,54 +115,109 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     else:
         input_sent_new = input_sent.clone()
 
-    if 'bert' in args.model:
-        masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
-                                   torch.tensor([mask_id for token in option_tokens_list[option_id]]),
-                                   input_sent_new[0][pron_end_id:]]).unsqueeze(0)
-                        for option_id in range(2)]
-    elif 'gpt2' in args.model:
-        masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
-                                   option_tokens_list[option_id].clone(),
-                                   input_sent_new[0][pron_end_id:]]).unsqueeze(0)
-                        for option_id in range(2)]
+    if output_for_attn:
+        assert 'bert' in args.model
+        masked_sent = input_sent_new.clone()
+        if not args.no_mask:
+            masked_sent[:,pron_start_id:pron_end_id] = mask_id
+        with torch.no_grad():
+            output = model(masked_sent.to(args.device))
 
-    with torch.no_grad():
-        outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
+    else:
+        if 'bert' in args.model:
+            masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
+                                       torch.tensor([mask_id for token in option_tokens_list[option_id]]),
+                                       input_sent_new[0][pron_end_id:]]).unsqueeze(0)
+                            for option_id in range(2)]
+        elif 'gpt2' in args.model:
+            masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
+                                       option_tokens_list[option_id].clone(),
+                                       input_sent_new[0][pron_end_id:]]).unsqueeze(0)
+                            for option_id in range(2)]
+
+        with torch.no_grad():
+            outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
 
     # realign tokens
-    if mask_context:
-        output_token_ids = {}
+    aligned_token_ids = {}
+    pron_length = pron_end_id-pron_start_id
+    context_length = context_end_id-context_start_id
+    if output_for_attn:
+        assert 'bert' in args.model
+        mask_length = pron_end_id-pron_start_id
+        aligned_token_ids['option_1'] = option_ids[0]
+        aligned_token_ids['option_2'] = option_ids[1]
+        aligned_token_ids['context'] = np.array([context_start_id,context_end_id])
+        aligned_token_ids['masks'] = np.array([pron_start_id,pron_end_id])
+        aligned_token_ids['period'] = period_id
+
+        output_token_ids = CheckRealignment(tokenizer,mask_id,masked_sent,
+                                            options,context,aligned_token_ids,
+                                            mask_context,context_length,mask_length,
+                                            pron,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
+
+        return output, output_token_ids, option_tokens_list, masked_sent
     else:
-        # realign tokens
-        aligned_token_ids = {}
         output_token_ids = {}
-        pron_length = pron_end_id-pron_start_id
         for i in range(2):
+            mask_length = len(option_tokens_list[i])
+            masked_option = options[i]
             aligned_token_ids[f'masked_sent_{i+1}'] = {}
             aligned_token_ids[f'masked_sent_{i+1}']['option_1'] = option_ids[0]+(len(option_tokens_list[i])-pron_length)*(pron_start_id<option_ids[0][0])
             aligned_token_ids[f'masked_sent_{i+1}']['option_2'] = option_ids[1]+(len(option_tokens_list[i])-pron_length)*(pron_start_id<option_ids[1][0])
             aligned_token_ids[f'masked_sent_{i+1}']['context'] = np.array([context_start_id,context_end_id])+(len(option_tokens_list[i])-pron_length)*(pron_start_id<context_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['masks'] = np.array([pron_start_id,pron_start_id+len(option_tokens_list[i])])
             aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+len(option_tokens_list[i])-pron_length
-            CheckAlignment('choice',tokenizer,masked_sents[i],option_1,*aligned_token_ids[f'masked_sent_{i+1}']['option_1'])
-            CheckAlignment('choice',tokenizer,masked_sents[i],option_2,*aligned_token_ids[f'masked_sent_{i+1}']['option_2'])
-            CheckAlignment('context',tokenizer,masked_sents[i],context,*aligned_token_ids[f'masked_sent_{i+1}']['context'])
-            CheckAlignment('masks',tokenizer,masked_sents[i],
-                            ' '.join([tokenizer.decode([mask_id]) for _ in range(len(option_tokens_list[i]))]),
-                            *aligned_token_ids[f'masked_sent_{i+1}']['masks'])
-            CheckAlignment('period',tokenizer,masked_sents[i],None,aligned_token_ids[f'masked_sent_{i+1}']['period'],None)
-            output_token_ids[f'masked_sent_{i+1}'] = {}
-            output_token_ids[f'masked_sent_{i+1}']['option_1'] = torch.tensor([i for i in range(*aligned_token_ids[f'masked_sent_{i+1}']['option_1'])]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['option_2'] = torch.tensor([i for i in range(*aligned_token_ids[f'masked_sent_{i+1}']['option_2'])]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['context'] = torch.tensor([i for i in range(*aligned_token_ids[f'masked_sent_{i+1}']['context'])]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['masks'] = torch.tensor([i for i in range(*aligned_token_ids[f'masked_sent_{i+1}']['masks'])]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['period'] = torch.tensor([aligned_token_ids[f'masked_sent_{i+1}']['period']]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['cls'] = torch.tensor([0]).to(args.device)
-            output_token_ids[f'masked_sent_{i+1}']['sep'] = torch.tensor([-1]).to(args.device)
+
+            output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(tokenizer,mask_id,masked_sents[i],
+                                                                        options,context,aligned_token_ids[f'masked_sent_{i+1}'],
+                                                                        mask_context,context_length,mask_length,
+                                                                        masked_option,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
 
-    return outputs, output_token_ids, option_tokens_list, masked_sents
+        return outputs, output_token_ids, option_tokens_list, masked_sents
+
+def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
+    CheckAlignment('choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
+    CheckAlignment('choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+    if mask_context:
+        CheckAlignment('context',tokenizer,masked_sent,
+                        ' '.join([tokenizer.decode([mask_id]) for _ in range(context_length)]),
+                        *aligned_token_ids['context'])
+    else:
+        CheckAlignment('context',tokenizer,masked_sent,context,*aligned_token_ids['context'])
+    if 'bert' in args.model:
+        if output_for_attn and args.no_mask:
+            CheckAlignment('masks',tokenizer,masked_sent,
+                            masked_option,
+                            *aligned_token_ids['masks'])
+        else:
+            CheckAlignment('masks',tokenizer,masked_sent,
+                            ' '.join([tokenizer.decode([mask_id]) for _ in range(mask_length)]),
+                            *aligned_token_ids['masks'])
+    elif 'gpt2' in args.model:
+        CheckAlignment('masks',tokenizer,masked_sent,
+                        masked_option,
+                        *aligned_token_ids['masks'])
+    try:
+        CheckAlignment('period',tokenizer,masked_sent,None,aligned_token_ids['period'],None)
+    except AssertionError:
+        assert mask_context
+        CheckAlignment('context',tokenizer,masked_sent,tokenizer.decode([mask_id]),
+                        aligned_token_ids['period'],
+                        aligned_token_ids['period']+1)
+
+    output_token_ids = {}
+    output_token_ids['option_1'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]).to(args.device)
+    output_token_ids['option_2'] = torch.tensor([i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
+    output_token_ids['context'] = torch.tensor([i for i in range(*aligned_token_ids['context'])]).to(args.device)
+    output_token_ids['masks'] = torch.tensor([i for i in range(*aligned_token_ids['masks'])]).to(args.device)
+    output_token_ids['period'] = torch.tensor([aligned_token_ids['period']]).to(args.device)
+    output_token_ids['cls'] = torch.tensor([0]).to(args.device)
+    output_token_ids['sep'] = torch.tensor([-1]).to(args.device)
+
+    return output_token_ids
 
 def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
     if 'bert' in args.model:
