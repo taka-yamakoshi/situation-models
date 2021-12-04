@@ -96,11 +96,11 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     context_word_id = int(line[head.index(f'context_word_id')])
 
     input_sent = tokenizer(sent,return_tensors='pt')['input_ids']
-    pron_start_id,pron_end_id = AlignTokens('pron',args.model,tokenizer,sent,input_sent,pron,pron_word_id)
-    option_1_start_id,option_1_end_id = AlignTokens('choice',args.model,tokenizer,sent,input_sent,option_1,option_1_word_id)
-    option_2_start_id,option_2_end_id = AlignTokens('choice',args.model,tokenizer,sent,input_sent,option_2,option_2_word_id)
-    context_start_id,context_end_id = AlignTokens('context',args.model,tokenizer,sent,input_sent,context,context_word_id)
-    period_id = AlignTokens('period',args.model,tokenizer,sent,input_sent,None,None)
+    pron_start_id,pron_end_id = AlignTokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
+    option_1_start_id,option_1_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_1,option_1_word_id)
+    option_2_start_id,option_2_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_2,option_2_word_id)
+    context_start_id,context_end_id = AlignTokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
+    period_id = AlignTokens(args,'period',tokenizer,sent,input_sent,None,None)
 
     option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
                             input_sent[0][option_2_start_id:option_2_end_id]]
