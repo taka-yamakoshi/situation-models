@@ -196,7 +196,8 @@ if __name__=='__main__':
     parser.add_argument('--pos_type', type = str, required = True)
     args = parser.parse_args()
     # context and masks perturbations should be the last since they may change the sentence length
-    assert args.pos_type in ['choice','context','masks','period','cls','sep','cls_sep','cls_period_sep','choice_context']
+    assert args.rep_type in ['test','layer','layer_query','key_value','layer_query_key_value']
+    assert args.pos_type in ['test','choice','context','masks','period','cls','sep','cls_sep','cls_period_sep','choice_context']
     print(f'running with {args}')
 
     head,text = LoadDataset(args)

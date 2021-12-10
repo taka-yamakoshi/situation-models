@@ -32,16 +32,18 @@ def calc_attn_norm(model,hidden,attention,args):
     assert num_heads*head_dim==hidden[0].shape[-1]
     attn_norm = np.empty((num_layers,num_heads,seq_len,seq_len))
     for layer_id in range(num_layers):
-        if 'bert-' in args.model:
-            value = model.bert.encoder.layer[layer_id].attention.self.value(hidden[layer_id]).to('cpu')
-        elif 'roberta-' in args.model:
-            value = model.roberta.encoder.layer[layer_id].attention.self.value(hidden[layer_id]).to('cpu')
-        assert value.shape==hidden[layer_id].to('cpu').shape
+        if args.model.startswith('bert'):
+            value = model.bert.encoder.layer[layer_id].attention.self.value(hidden[layer_id])
+        elif args.model.startswith('roberta'):
+            value = model.roberta.encoder.layer[layer_id].attention.self.value(hidden[layer_id])
+        elif args.model.startswith('albert'):
+            value = model.albert.encoder.albert_layer_groups[0].albert_layers[0].attention.value(hidden[layer_id])
+        assert value.shape==hidden[layer_id].shape
         for head_id in range(num_heads):
             head_value = value[0,:,head_dim*head_id:head_dim*(head_id+1)]
-            head_attn = attention[layer_id][0][head_id].to('cpu')
+            head_attn = attention[layer_id][0][head_id]
             alpha_value = head_attn[...,None]*head_value[None,...]
-            attn_norm[layer_id,head_id] = torch.linalg.norm(alpha_value,dim=-1).detach().numpy()
+            attn_norm[layer_id,head_id] = torch.linalg.norm(alpha_value,dim=-1).to('cpu').detach().numpy()
     return attn_norm
 
 def EvaluateAttention(attention,token_ids):
