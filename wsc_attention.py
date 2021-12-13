@@ -47,22 +47,14 @@ def calc_attn_norm(model,hidden,attention,args):
     return attn_norm
 
 def EvaluateAttention(attention,token_ids):
+    attn_dict = {}
     pron_token_id = token_ids['pron_id'].to('cpu')
-    attn_choice_1 = attention[:,:,pron_token_id,token_ids['option_1'].to('cpu')]
-    attn_choice_2 = attention[:,:,pron_token_id,token_ids['option_2'].to('cpu')]
-    attn_context = attention[:,:,pron_token_id,token_ids['context'].to('cpu')]
-    attn_period = attention[:,:,pron_token_id,token_ids['period'].to('cpu')]
-
-    if len(attn_choice_1.shape)==3:
-        attn_choice_1 = attn_choice_1.sum(axis=-1)
-    if len(attn_choice_2.shape)==3:
-        attn_choice_2 = attn_choice_2.sum(axis=-1)
-    if len(attn_context.shape)==3:
-        attn_context = attn_context.sum(axis=-1)
-    if len(attn_period.shape)==3:
-        attn_period = attn_period.sum(axis=-1)
-
-    return attn_choice_1,attn_choice_2,attn_context,attn_period
+    for feature in ['option_1','option_2','context','period','cls','sep','other']:
+        attn = attention[:,:,pron_token_id,token_ids[feature].to('cpu')]
+        if len(attn.shape)==3:
+            attn = attn.sum(axis=-1)
+        attn_dict[feature] = attn
+    return attn_dict
 
 def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
     output, token_ids, option_tokens_list, masked_sent = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context, output_for_attn=True)
@@ -113,18 +105,14 @@ if __name__=='__main__':
 
     out_dict = {}
     for line in text[:500]:
-        attn_choice_1_context_1,attn_choice_2_context_1,attn_context_context_1,attn_period_context_1 = CalcAttn(head,line,1,model,tokenizer,mask_id,args)
-        attn_choice_1_context_2,attn_choice_2_context_2,attn_context_context_2,attn_period_context_2 = CalcAttn(head,line,2,model,tokenizer,mask_id,args)
+        attn_dict_1 = CalcAttn(head,line,1,model,tokenizer,mask_id,args)
+        attn_dict_2 = CalcAttn(head,line,2,model,tokenizer,mask_id,args)
 
         out_dict[line[head.index('pair_id')]] = {}
-        out_dict[line[head.index('pair_id')]]['choice_1_context_1'] = attn_choice_1_context_1
-        out_dict[line[head.index('pair_id')]]['choice_2_context_1'] = attn_choice_2_context_1
-        out_dict[line[head.index('pair_id')]]['choice_1_context_2'] = attn_choice_1_context_2
-        out_dict[line[head.index('pair_id')]]['choice_2_context_2'] = attn_choice_2_context_2
-        out_dict[line[head.index('pair_id')]]['context_1'] = attn_context_context_1
-        out_dict[line[head.index('pair_id')]]['context_2'] = attn_context_context_2
-        out_dict[line[head.index('pair_id')]]['period_1'] = attn_period_context_1
-        out_dict[line[head.index('pair_id')]]['period_2'] = attn_period_context_2
+        for sent_id,attn_dict in zip([1,2],[attn_dict_1,attn_dict_2]):
+            for key,val in attn_dict.items():
+                out_dict[line[head.index('pair_id')]][f'{key}_sent_{sent_id}'] = val
+
 
     if args.dataset=='superglue':
         with open(f'datafile/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
