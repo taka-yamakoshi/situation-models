@@ -94,12 +94,15 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     option_2_word_id = int(line[head.index(f'option_2_word_id_{sent_id}')])
     context = line[head.index(f'context_{sent_id}')]
     context_word_id = int(line[head.index(f'context_word_id')])
+    other = line[head.index(f'other')]
+    other_word_id = int(line[head.index(f'other_word_id_{sent_id}')])
 
     input_sent = tokenizer(sent,return_tensors='pt')['input_ids']
     pron_start_id,pron_end_id = AlignTokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
     option_1_start_id,option_1_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_1,option_1_word_id)
     option_2_start_id,option_2_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_2,option_2_word_id)
     context_start_id,context_end_id = AlignTokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
+    other_start_id,other_end_id = AlignTokens(args,'other',tokenizer,sent,input_sent,other,other_word_id)
     period_id = AlignTokens(args,'period',tokenizer,sent,input_sent,None,None)
 
     option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
@@ -149,10 +152,11 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         aligned_token_ids['option_2'] = option_ids[1]
         aligned_token_ids['context'] = np.array([context_start_id,context_end_id])
         aligned_token_ids['masks'] = np.array([pron_start_id,pron_end_id])
+        aligned_token_ids['other'] = np.array([other_start_id,other_end_id])
         aligned_token_ids['period'] = period_id
 
         output_token_ids = CheckRealignment(tokenizer,mask_id,masked_sent,
-                                            options,context,aligned_token_ids,
+                                            options,context,other,aligned_token_ids,
                                             mask_context,context_length,mask_length,
                                             pron,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
@@ -162,25 +166,28 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         output_token_ids = {}
         for i in range(2):
             mask_length = len(option_tokens_list[i])
+            shift = mask_length - pron_length
             masked_option = options[i]
             aligned_token_ids[f'masked_sent_{i+1}'] = {}
-            aligned_token_ids[f'masked_sent_{i+1}']['option_1'] = option_ids[0]+(len(option_tokens_list[i])-pron_length)*(pron_start_id<option_ids[0][0])
-            aligned_token_ids[f'masked_sent_{i+1}']['option_2'] = option_ids[1]+(len(option_tokens_list[i])-pron_length)*(pron_start_id<option_ids[1][0])
-            aligned_token_ids[f'masked_sent_{i+1}']['context'] = np.array([context_start_id,context_end_id])+(len(option_tokens_list[i])-pron_length)*(pron_start_id<context_start_id)
-            aligned_token_ids[f'masked_sent_{i+1}']['masks'] = np.array([pron_start_id,pron_start_id+len(option_tokens_list[i])])
-            aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+len(option_tokens_list[i])-pron_length
+            aligned_token_ids[f'masked_sent_{i+1}']['option_1'] = option_ids[0]+shift*(pron_start_id<option_ids[0][0])
+            aligned_token_ids[f'masked_sent_{i+1}']['option_2'] = option_ids[1]+shift*(pron_start_id<option_ids[1][0])
+            aligned_token_ids[f'masked_sent_{i+1}']['context'] = np.array([context_start_id,context_end_id])+shift*(pron_start_id<context_start_id)
+            aligned_token_ids[f'masked_sent_{i+1}']['masks'] = np.array([pron_start_id,pron_start_id+mask_length])
+            aligned_token_ids[f'masked_sent_{i+1}']['other'] = np.array([other_start_id,other_end_id])+shift*(pron_start_id<other_start_id)
+            aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+shift
 
             output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(tokenizer,mask_id,masked_sents[i],
-                                                                        options,context,aligned_token_ids[f'masked_sent_{i+1}'],
+                                                                        options,context,other,aligned_token_ids[f'masked_sent_{i+1}'],
                                                                         mask_context,context_length,mask_length,
                                                                         masked_option,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
 
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
-def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
+def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
     CheckAlignment('choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
     CheckAlignment('choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+    CheckAlignment('other',tokenizer,masked_sent,other,*aligned_token_ids['other'])
     if mask_context:
         CheckAlignment('context',tokenizer,masked_sent,
                         ' '.join([tokenizer.decode([mask_id]) for _ in range(context_length)]),
@@ -209,10 +216,8 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,aligned_token
                         aligned_token_ids['period']+1)
 
     output_token_ids = {}
-    output_token_ids['option_1'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]).to(args.device)
-    output_token_ids['option_2'] = torch.tensor([i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
-    output_token_ids['context'] = torch.tensor([i for i in range(*aligned_token_ids['context'])]).to(args.device)
-    output_token_ids['masks'] = torch.tensor([i for i in range(*aligned_token_ids['masks'])]).to(args.device)
+    for feature in ['option_1','option_2','context','masks','other']:
+        output_token_ids[feature] = torch.tensor([i for i in range(*aligned_token_ids[feature])]).to(args.device)
     output_token_ids['period'] = torch.tensor([aligned_token_ids['period']]).to(args.device)
     output_token_ids['cls'] = torch.tensor([0]).to(args.device)
     output_token_ids['sep'] = torch.tensor([-1]).to(args.device)

@@ -20,7 +20,7 @@ def ExtractLayer(layer_id,model,args):
     return layer
 
 def CreateInterventions(layer_id,pos_type,rep_type,outputs,token_ids,args):
-    assert pos_type in ['choice','context','masks','period','cls','sep'] and rep_type in ['layer','key','query','value']
+    assert pos_type in ['choice','context','masks','period','cls','sep','other'] and rep_type in ['layer','key','query','value']
     if pos_type=='choice':
         if rep_type=='layer':
             vec_option_1 = outputs[1][layer_id][0,token_ids[f'option_1']]
@@ -42,7 +42,7 @@ def CreateInterventions(layer_id,pos_type,rep_type,outputs,token_ids,args):
         else:
             raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
         return vec_option_1, vec_option_2
-    elif pos_type in ['context','masks','period','cls','sep']:
+    elif pos_type in ['context','masks','period','cls','sep','other']:
         if rep_type=='layer':
             vec = outputs[1][layer_id][0,token_ids[f'{pos_type}']]
         elif rep_type in ['key','query','value']:
@@ -82,7 +82,7 @@ def ApplyInterventionsLayer(model,layer_id,pos_types,rep_types,outputs,token_ids
                     if f'{rep_type}_{layer_id}' not in interventions_1[f'masked_sent_{masked_sent_id}']:
                         interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
                     interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_option_1_context_1,vec_option_1_context_2),(pos_option_2_context_1,vec_option_2_context_2)])
-            elif pos_type in ['context','masks','period','cls','sep']:
+            elif pos_type in ['context','masks','period','cls','sep','other']:
                 pos_context_1 = token_ids_1[f'masked_sent_{masked_sent_id}'][f'{pos_type}']
                 for rep_type in rep_types:
                     vec_context_2 = CreateInterventions(layer_id,pos_type,rep_type,
@@ -93,6 +93,8 @@ def ApplyInterventionsLayer(model,layer_id,pos_types,rep_types,outputs,token_ids
                     if f'{rep_type}_{layer_id}' not in interventions_1[f'masked_sent_{masked_sent_id}']:
                         interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
                     interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_context_1,vec_context_2)])
+            else:
+                raise NotImplementedError(f'pos_type "{pos_type}" is not supported')
 
 
     interventions_2 = {'masked_sent_1':{},'masked_sent_2':{}}
@@ -110,7 +112,7 @@ def ApplyInterventionsLayer(model,layer_id,pos_types,rep_types,outputs,token_ids
                     if f'{rep_type}_{layer_id}' not in interventions_2[f'masked_sent_{masked_sent_id}']:
                         interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
                     interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_option_1_context_2,vec_option_1_context_1),(pos_option_2_context_2,vec_option_2_context_1)])
-            elif pos_type in ['context','period','cls','sep']:
+            elif pos_type in ['context','masks','period','cls','sep','other']:
                 pos_context_2 = token_ids_2[f'masked_sent_{masked_sent_id}'][f'{pos_type}']
                 for rep_type in rep_types:
                     vec_context_1 = CreateInterventions(layer_id,pos_type,rep_type,
@@ -121,6 +123,8 @@ def ApplyInterventionsLayer(model,layer_id,pos_types,rep_types,outputs,token_ids
                     if f'{rep_type}_{layer_id}' not in interventions_2[f'masked_sent_{masked_sent_id}']:
                         interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
                     interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_context_2,vec_context_1)])
+            else:
+                raise NotImplementedError(f'pos_type "{pos_type}" is not supported')
 
     if verbose:
         for interventions in [interventions_1['masked_sent_1'],interventions_1['masked_sent_2'],interventions_2['masked_sent_1'],interventions_2['masked_sent_2']]:
@@ -194,10 +198,12 @@ if __name__=='__main__':
     parser.add_argument('--core_id', type = int, default=0)
     parser.add_argument('--rep_type', type = str, required = True)
     parser.add_argument('--pos_type', type = str, required = True)
+    parser.add_argument('--test',dest='test',action='store_true')
+    parser.set_defaults(test=False)
     args = parser.parse_args()
     # context and masks perturbations should be the last since they may change the sentence length
-    assert args.rep_type in ['test','layer','layer_query','key_value','layer_query_key_value']
-    assert args.pos_type in ['test','choice','context','masks','period','cls','sep','cls_sep','cls_period_sep','choice_context']
+    assert args.rep_type in ['layer','layer_query','key_value','layer_query_key_value']
+    assert args.pos_type in ['choice','context','masks','period','cls','sep','cls_sep','cls_period_sep','choice_context','other']
     print(f'running with {args}')
 
     head,text = LoadDataset(args)

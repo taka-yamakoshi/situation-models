@@ -1,7 +1,7 @@
 import numpy as np
 
 def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=False):
-    assert target_name in ['pron','choice','context','period']
+    assert target_name in ['pron','choice','context','period','other']
     if target_name=='period':
         # if you didn't include <|endoftext|> token for gpt2 you need to fix here
         if 'bert' in args.model:
@@ -34,7 +34,7 @@ def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=
         return target_start_id,target_end_id
 
 def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose=False):
-    assert target_name in ['pron','masks','choice','context','period']
+    assert target_name in ['pron','masks','choice','context','period','other']
     if target_name=='period':
         recreated_target = tokenizer.decode(input_sent[0][start_id])
         assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target
@@ -42,4 +42,4 @@ def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose
         recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
         if verbose:
             print(word,recreated_target)
-        assert recreated_target.strip(' ,.').lower() in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
+        assert recreated_target.strip(' ,.;:').lower() in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'

@@ -104,7 +104,8 @@ if __name__=='__main__':
                 'option_1','option_2',
                 'option_1_word_id_1','option_2_word_id_1',
                 'option_1_word_id_2','option_2_word_id_2',
-                'context_1','context_2','context_word_id']
+                'context_1','context_2','context_word_id',
+                'other','other_word_id_1','other_word_id_2']
         writer.writerow(head)
         for key,value in wsc_data.items():
             if len(value)==2:
@@ -119,9 +120,9 @@ if __name__=='__main__':
                     schema_1 = value[1]
                     schema_2 = value[0]
                 else:
-                    print('Invalid Answers')
-                    print(value[0]['sentence'])
-                    print(value[1]['sentence'])
+                    #print('Invalid Answers')
+                    #print(value[0]['sentence'])
+                    #print(value[1]['sentence'])
                     continue
 
                 assert schema_1['option_1']==schema_2['option_1']
@@ -151,8 +152,44 @@ if __name__=='__main__':
                 if context_word_id_1!=context_word_id_2:
                     continue
 
-                schema_data_all['context_1'] = context_1.strip(',.')
-                schema_data_all['context_2'] = context_2.strip(',.')
+                schema_data_all['context_1'] = context_1.strip(' ,.;:')
+                schema_data_all['context_2'] = context_2.strip(' ,.;:')
                 schema_data_all['context_word_id'] = context_word_id_1
+
+                word_ids_1 = [*[schema_data_all[f'pron_word_id_1']+i for i in range(len(schema_data_all[f'pron_1'].split(' ')))],
+                            *[schema_data_all[f'option_1_word_id_1']+i for i in range(len(schema_data_all[f'option_1'].split(' ')))],
+                            *[schema_data_all[f'option_2_word_id_1']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
+                            *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_1'].split(' ')))],
+                            len(schema_data_all[f'sent_1'].split(' '))-1]
+                word_ids_2 = [*[schema_data_all[f'pron_word_id_2']+i for i in range(len(schema_data_all[f'pron_2'].split(' ')))],
+                            *[schema_data_all[f'option_1_word_id_2']+i for i in range(len(schema_data_all[f'option_1'].split(' ')))],
+                            *[schema_data_all[f'option_2_word_id_2']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
+                            *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_2'].split(' ')))],
+                            len(schema_data_all[f'sent_2'].split(' '))-1]
+
+                split_sent_1 = schema_data_all[f'sent_1'].split(' ')
+                split_sent_2 = schema_data_all[f'sent_2'].split(' ')
+                other_word_ids_1 = [i for i in range(len(split_sent_1)) if i not in word_ids_1]
+                other_word_ids_2 = [i for i in range(len(split_sent_2)) if i not in word_ids_2]
+                other_words_1 = [split_sent_1[word_id] for word_id in other_word_ids_1]
+                other_words_2 = [split_sent_2[word_id] for word_id in other_word_ids_2]
+
+                assert len(other_words_1)==len(other_words_2)
+                if not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_1,other_words_2)]):
+                    #print(other_words_1)
+                    #print(other_words_2)
+                    continue
+
+                other_word = ''
+                while other_word.strip(' ,.;:')=='':
+                    rand_id = np.random.choice(len(other_words_1))
+                    other_word_id_1 = other_word_ids_1[rand_id]
+                    other_word_id_2 = other_word_ids_2[rand_id]
+                    assert split_sent_1[other_word_id_1]==split_sent_2[other_word_id_2]
+                    other_word = split_sent_1[other_word_id_1].strip(' ,.;:')
+
+                schema_data_all[f'other_word_id_1'] = other_word_id_1
+                schema_data_all[f'other_word_id_2'] = other_word_id_2
+                schema_data_all[f'other'] = other_word
 
                 writer.writerow([schema_data_all[feature] for feature in head])
