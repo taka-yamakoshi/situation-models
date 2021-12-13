@@ -41,6 +41,7 @@ def FindContext(sent_1,sent_2):
     return context_1, context_2
 
 if __name__=='__main__':
+    np.random.seed(seed=2021)
     parser = argparse.ArgumentParser()
     parser.add_argument('--size', type = str, required = True, choices=['xs','s','m','l','xl','debiased'])
     args = parser.parse_args()
