@@ -40,6 +40,7 @@ def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose
         assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target
     else:
         recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
+        recreated_target = recreated_target.replace("' ","'").replace(" '","'").replace('" ','"').replace(' "','"').strip(' ,.;:').lower()
         if verbose:
             print(word,recreated_target)
-        assert recreated_target.replace("' ","'").strip(' ,.;:').lower() in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
+        assert recreated_target in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
