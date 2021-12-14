@@ -61,89 +61,70 @@ def CreateInterventions(layer_id,pos_type,rep_type,outputs,token_ids,args):
         return vec
 
 def ApplyInterventionsLayer(model,layer_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args,verbose=False):
-    # Unpack the input
-    token_ids_1 = token_ids[0]
-    token_ids_2 = token_ids[1]
-    option_tokens_list_1 = option_tokens_lists[0]
-    option_tokens_list_2 = option_tokens_lists[1]
-
-    interventions_1 = {'masked_sent_1':{},'masked_sent_2':{}}
-    for masked_sent_id in [1,2]:
-        for pos_type in pos_types:
-            if pos_type=='choice':
-                pos_option_1_context_1 = token_ids_1[f'masked_sent_{masked_sent_id}']['option_1']
-                pos_option_2_context_1 = token_ids_1[f'masked_sent_{masked_sent_id}']['option_2']
-                for rep_type in rep_types:
-                    vec_option_1_context_2,vec_option_2_context_2 = CreateInterventions(layer_id,pos_type,rep_type,
-                                                                                        outputs[f'masked_sent_{masked_sent_id}_context_2'],
-                                                                                        token_ids_2[f'masked_sent_{masked_sent_id}'],args)
-                    assert len(pos_option_1_context_1)==len(vec_option_1_context_2)
-                    assert len(pos_option_2_context_1)==len(vec_option_2_context_2)
-                    if f'{rep_type}_{layer_id}' not in interventions_1[f'masked_sent_{masked_sent_id}']:
-                        interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
-                    interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_option_1_context_1,vec_option_1_context_2),(pos_option_2_context_1,vec_option_2_context_2)])
-            elif pos_type in ['context','masks','period','cls','sep','other']:
-                pos_context_1 = token_ids_1[f'masked_sent_{masked_sent_id}'][f'{pos_type}']
-                for rep_type in rep_types:
-                    vec_context_2 = CreateInterventions(layer_id,pos_type,rep_type,
-                                                        outputs[f'masked_sent_{masked_sent_id}_context_2'],
-                                                        token_ids_2[f'masked_sent_{masked_sent_id}'],args)
-                    if pos_type!='context':
-                        assert len(pos_context_1)==len(vec_context_2)
-                    if f'{rep_type}_{layer_id}' not in interventions_1[f'masked_sent_{masked_sent_id}']:
-                        interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
-                    interventions_1[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_context_1,vec_context_2)])
-            else:
-                raise NotImplementedError(f'pos_type "{pos_type}" is not supported')
-
-
-    interventions_2 = {'masked_sent_1':{},'masked_sent_2':{}}
-    for masked_sent_id in [1,2]:
-        for pos_type in pos_types:
-            if pos_type=='choice':
-                pos_option_1_context_2 = token_ids_2[f'masked_sent_{masked_sent_id}']['option_1']
-                pos_option_2_context_2 = token_ids_2[f'masked_sent_{masked_sent_id}']['option_2']
-                for rep_type in rep_types:
-                    vec_option_1_context_1,vec_option_2_context_1 = CreateInterventions(layer_id,pos_type,rep_type,
-                                                                                        outputs[f'masked_sent_{masked_sent_id}_context_1'],
-                                                                                        token_ids_1[f'masked_sent_{masked_sent_id}'],args)
-                    assert len(pos_option_1_context_2)==len(vec_option_1_context_1)
-                    assert len(pos_option_2_context_2)==len(vec_option_2_context_1)
-                    if f'{rep_type}_{layer_id}' not in interventions_2[f'masked_sent_{masked_sent_id}']:
-                        interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
-                    interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_option_1_context_2,vec_option_1_context_1),(pos_option_2_context_2,vec_option_2_context_1)])
-            elif pos_type in ['context','masks','period','cls','sep','other']:
-                pos_context_2 = token_ids_2[f'masked_sent_{masked_sent_id}'][f'{pos_type}']
-                for rep_type in rep_types:
-                    vec_context_1 = CreateInterventions(layer_id,pos_type,rep_type,
-                                                        outputs[f'masked_sent_{masked_sent_id}_context_1'],
-                                                        token_ids_1[f'masked_sent_{masked_sent_id}'],args)
-                    if pos_type!='context':
-                        assert len(pos_context_2)==len(vec_context_1)
-                    if f'{rep_type}_{layer_id}' not in interventions_2[f'masked_sent_{masked_sent_id}']:
-                        interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
-                    interventions_2[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_context_2,vec_context_1)])
-            else:
-                raise NotImplementedError(f'pos_type "{pos_type}" is not supported')
+    interventions_all = []
+    for context_id in range(2):
+        interventions = {'masked_sent_1':{},'masked_sent_2':{}}
+        for masked_sent_id in [1,2]:
+            for pos_type in pos_types:
+                if pos_type=='choice':
+                    pos_option_1 = token_ids[context_id][f'masked_sent_{masked_sent_id}']['option_1']
+                    pos_option_2 = token_ids[context_id][f'masked_sent_{masked_sent_id}']['option_2']
+                    for rep_type in rep_types:
+                        if args.test:
+                            vec_option_1,vec_option_2 = CreateInterventions(layer_id,pos_type,rep_type,
+                                                                            outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
+                                                                            token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
+                        else:
+                            vec_option_1,vec_option_2 = CreateInterventions(layer_id,pos_type,rep_type,
+                                                                            outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
+                                                                            token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
+                        assert len(pos_option_1)==len(vec_option_1)
+                        assert len(pos_option_2)==len(vec_option_2)
+                        if f'{rep_type}_{layer_id}' not in interventions[f'masked_sent_{masked_sent_id}']:
+                            interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
+                        interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos_option_1,vec_option_1),(pos_option_2,vec_option_2)])
+                elif pos_type in ['context','masks','period','cls','sep','other']:
+                    pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_type}']
+                    for rep_type in rep_types:
+                        if args.test:
+                            vec = CreateInterventions(layer_id,pos_type,rep_type,
+                                                    outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
+                                                    token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
+                        else:
+                            vec = CreateInterventions(layer_id,pos_type,rep_type,
+                                                    outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
+                                                    token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
+                        if pos_type!='context':
+                            assert len(pos)==len(vec)
+                        if f'{rep_type}_{layer_id}' not in interventions[f'masked_sent_{masked_sent_id}']:
+                            interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
+                        interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos,vec)])
+                else:
+                    raise NotImplementedError(f'pos_type "{pos_type}" is not supported')
+        interventions_all.append(interventions)
 
     if verbose:
-        for interventions in [interventions_1['masked_sent_1'],interventions_1['masked_sent_2'],interventions_2['masked_sent_1'],interventions_2['masked_sent_2']]:
-            for key,value in interventions.items():
+        for intervention in [interventions_all[0]['masked_sent_1'],interventions_all[0]['masked_sent_2'],interventions_all[1]['masked_sent_1'],interventions_all[1]['masked_sent_2']]:
+            for key,value in intervention.items():
                 print(key)
                 for pair in value:
                     print(pair[0],pair[1].shape)
 
-    int_logits_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],model,interventions_1['masked_sent_1'],args)
-    int_logits_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],model,interventions_1['masked_sent_2'],args)
-    int_logits_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],model,interventions_2['masked_sent_1'],args)
-    int_logits_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],model,interventions_2['masked_sent_2'],args)
+    int_logits_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],model,interventions_all[0]['masked_sent_1'],args)
+    int_logits_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],model,interventions_all[0]['masked_sent_2'],args)
+    int_logits_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],model,interventions_all[1]['masked_sent_1'],args)
+    int_logits_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],model,interventions_all[1]['masked_sent_2'],args)
 
     if 'context' in pos_types:
-        token_ids_new_1 = token_ids_2
-        token_ids_new_2 = token_ids_1
+        token_ids_new_1 = token_ids[1]
+        token_ids_new_2 = token_ids[0]
     else:
-        token_ids_new_1 = token_ids_1
-        token_ids_new_2 = token_ids_2
+        token_ids_new_1 = token_ids[0]
+        token_ids_new_2 = token_ids[1]
+
+    option_tokens_list_1 = option_tokens_lists[0]
+    option_tokens_list_2 = option_tokens_lists[1]
+
     choice_probs_sum_1,choice_probs_ave_1 = EvaluatePredictions(int_logits_1_context_1,int_logits_2_context_1,token_ids_new_1,option_tokens_list_1,args)
     choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_logits_1_context_2,int_logits_2_context_2,token_ids_new_2,option_tokens_list_2,args)
 
@@ -206,6 +187,11 @@ if __name__=='__main__':
     assert args.pos_type in ['choice','context','masks','period','cls','sep','cls_sep','cls_period_sep','choice_context','other']
     print(f'running with {args}')
 
+    if args.test:
+        test_id = '_test'
+    else:
+        test_id = ''
+
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
 
@@ -215,10 +201,10 @@ if __name__=='__main__':
         out_dict[line[head.index('pair_id')]] = results
 
     if args.dataset=='superglue':
-        with open(f'datafile/superglue_wsc_intervention_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}.pkl','wb') as f:
+        with open(f'datafile/superglue_wsc_intervention_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}{test_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     elif args.dataset=='winogrande':
-        with open(f'datafile/winogrande_{args.size}_intervention_{args.pos_type}_{args.rep_type}_{args.model}.pkl','wb') as f:
+        with open(f'datafile/winogrande_{args.size}_intervention_{args.pos_type}_{args.rep_type}_{args.model}{test_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)
 
     print(f'Time it took: {time.time()-start}')
