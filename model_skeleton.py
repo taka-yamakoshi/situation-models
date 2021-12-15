@@ -81,6 +81,10 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
         #calculate the attention matrix
         attn_mat = F.softmax(split_query@split_key.permute(0,1,3,2)/math.sqrt(head_dim),dim=-1)
 
+        for head_id in range(num_heads):
+            if f'attention_{layer_id}_{head_id}' in interventions:
+                attn_mat[:,head_id,:,:] = interventions[f'attention_{layer_id}_{head_id}'].clone()
+
         z_rep_indiv = attn_mat@split_value
         z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*hidden.size())
 
