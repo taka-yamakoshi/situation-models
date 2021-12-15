@@ -157,37 +157,36 @@ if __name__=='__main__':
                 schema_data_all['context_2'] = context_2.strip(' ,.;:')
                 schema_data_all['context_word_id'] = context_word_id_1
 
-                word_ids_1 = [*[schema_data_all[f'pron_word_id_1']+i for i in range(len(schema_data_all[f'pron_1'].split(' ')))],
-                            *[schema_data_all[f'option_1_word_id_1']+i for i in range(len(schema_data_all[f'option_1'].split(' ')))],
-                            *[schema_data_all[f'option_2_word_id_1']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
-                            *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_1'].split(' ')))],
-                            len(schema_data_all[f'sent_1'].split(' '))-1]
-                word_ids_2 = [*[schema_data_all[f'pron_word_id_2']+i for i in range(len(schema_data_all[f'pron_2'].split(' ')))],
-                            *[schema_data_all[f'option_1_word_id_2']+i for i in range(len(schema_data_all[f'option_1'].split(' ')))],
-                            *[schema_data_all[f'option_2_word_id_2']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
-                            *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_2'].split(' ')))],
-                            len(schema_data_all[f'sent_2'].split(' '))-1]
+                split_sent_list = []
+                other_word_ids_list = []
+                other_words_list = []
+                for sent_id in [1,2]:
+                    word_ids = [*[schema_data_all[f'pron_word_id_{sent_id}']+i for i in range(len(schema_data_all[f'pron_{sent_id}'].split(' ')))],
+                                *[schema_data_all[f'option_1_word_id_{sent_id}']+i for i in range(len(schema_data_all[f'option_1'].split(' ')))],
+                                *[schema_data_all[f'option_2_word_id_{sent_id}']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
+                                *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_{sent_id}'].split(' ')))],
+                                len(schema_data_all[f'sent_{sent_id}'].split(' '))-1]
+                    split_sent = schema_data_all[f'sent_{sent_id}'].split(' ')
+                    other_word_ids = [i for i in range(len(split_sent)) if i not in word_ids]
+                    other_words = [split_sent[word_id] for word_id in other_word_ids]
 
-                split_sent_1 = schema_data_all[f'sent_1'].split(' ')
-                split_sent_2 = schema_data_all[f'sent_2'].split(' ')
-                other_word_ids_1 = [i for i in range(len(split_sent_1)) if i not in word_ids_1]
-                other_word_ids_2 = [i for i in range(len(split_sent_2)) if i not in word_ids_2]
-                other_words_1 = [split_sent_1[word_id] for word_id in other_word_ids_1]
-                other_words_2 = [split_sent_2[word_id] for word_id in other_word_ids_2]
+                    split_sent_list.append(split_sent)
+                    other_word_ids_list.append(other_word_ids)
+                    other_words_list.append(other_words)
 
-                assert len(other_words_1)==len(other_words_2)
-                if not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_1,other_words_2)]):
+                assert len(other_words_list[0])==len(other_words_list[1])
+                if not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_list[0],other_words_list[1])]):
                     #print(other_words_1)
                     #print(other_words_2)
                     continue
 
                 other_word = ''
                 while other_word.strip(' ,.;:')=='':
-                    rand_id = np.random.choice(len(other_words_1))
-                    other_word_id_1 = other_word_ids_1[rand_id]
-                    other_word_id_2 = other_word_ids_2[rand_id]
-                    assert split_sent_1[other_word_id_1]==split_sent_2[other_word_id_2]
-                    other_word = split_sent_1[other_word_id_1].strip(' ,.;:')
+                    rand_id = np.random.choice(len(other_words_list[0]))
+                    other_word_id_1 = other_word_ids_list[0][rand_id]
+                    other_word_id_2 = other_word_ids_list[1][rand_id]
+                    assert split_sent_list[0][other_word_id_1]==split_sent_list[1][other_word_id_2]
+                    other_word = split_sent_list[0][other_word_id_1].strip(' ,.;:')
 
                 schema_data_all[f'other_word_id_1'] = other_word_id_1
                 schema_data_all[f'other_word_id_2'] = other_word_id_2
