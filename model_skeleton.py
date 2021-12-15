@@ -22,13 +22,6 @@ def args_setup_deberta(args,init_shape):
     args.attention_mask = args.encoder.get_attention_mask(args.attention_mask).to(args.device)
     return args
 
-#def args_setup_albert(args,init_shape):
-#    attention_mask = torch.ones(init_shape).to(args.device)
-#    args.extended_attention_mask = attention_mask.unsqueeze(1).unsqueeze(2)
-#    args.extended_attention_mask = args.extended_attention_mask.to(dtype=args.dtype)  # fp16 compatibility
-#    args.extended_attention_mask = (1.0-args.extended_attention_mask) * -10000.0
-#    return args
-
 @torch.no_grad()
 def layer_intervention(layer_id,layer,interventions,hidden,args):
     if args.model.startswith('deberta'):
@@ -43,19 +36,6 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
             hidden = args.encoder.conv(init_hidden, hidden, args.input_mask)
         return hidden
 
-
-    #elif args.model.startswith('albert'):
-    #    if f'layer_{layer_id}' in interventions:
-    #        for (pos,vec) in interventions[f'layer_{layer_id}']:
-    #            hidden = swap_vecs(hidden,pos,vec,args)
-    #        args = args_setup_albert(args, hidden.shape[:-1])
-    #    layers_per_group = int(args.encoder.config.num_hidden_layers/args.encoder.config.num_hidden_groups)
-    #    group_idx = int(layer_id/(args.encoder.config.num_hidden_layers/args.encoder.config.num_hidden_groups))
-    #    hidden = args.encoder.albert_layer_groups[group_idx](hidden,
-    #                                                        args.extended_attention_mask,
-    #                                                        args.head_mask[group_idx*layers_per_group:(group_idx+1)*layers_per_group])[0]
-    #    return hidden
-
     else:
         if args.model.startswith('bert') or args.model.startswith('roberta'):
             attention_layer = layer.attention.self
@@ -64,7 +44,8 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
         num_heads = attention_layer.num_attention_heads
         head_dim = attention_layer.attention_head_size
         # if the intervention is layer only, apply the intervention first
-        if f'layer_{layer_id}' in interventions and f'query_{layer_id}' not in interventions:
+        if f'layer_{layer_id}' in interventions and f'key_{layer_id}' not in interventions\
+         and f'query_{layer_id}' not in interventions and f'value_{layer_id}' not in interventions:
             for (pos,vec) in interventions[f'layer_{layer_id}']:
                 hidden = swap_vecs(hidden,pos,vec,args)
             key = attention_layer.key(hidden)
@@ -136,10 +117,6 @@ def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
     elif args.model.startswith('albert'):
         core_model = model.albert
         lm_head = model.predictions
-        #args.head_mask = model.albert.get_head_mask(None, model.albert.config.num_hidden_layers)
-        #args.encoder = model.albert.encoder
-        #args.dtype = model.albert.dtype
-        #args = args_setup_albert(args, start_hidden.shape[:-1])
     else:
         raise NotImplementedError("invalid model name")
     hidden = start_hidden.clone()
