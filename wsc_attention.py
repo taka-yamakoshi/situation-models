@@ -51,9 +51,21 @@ def EvaluateAttention(attention,token_ids):
     pron_token_id = token_ids['pron_id'].to('cpu')
     for feature in ['option_1','option_2','context','period','cls','sep','other']:
         attn = attention[:,:,pron_token_id,token_ids[feature].to('cpu')]
-        if len(attn.shape)==3:
+        if len(token_ids[feature].to('cpu'))>1:
             attn = attn.sum(axis=-1)
-        attn_dict[feature] = attn
+        assert len(attn.shape)==2
+        attn_dict[f'pron_{feature}'] = attn
+    for option in ['option_1','option_2']:
+        for feature in ['pron_id','context','period','cls','sep','other']:
+            attn = attention[:,:,:,token_ids[feature].to('cpu')]
+            if len(token_ids[feature].to('cpu'))>1:
+                attn = attn.sum(axis=-1)
+            assert len(attn.shape)==3
+            attn = attn[:,:,token_ids[option].to('cpu')]
+            if len(token_ids[option].to('cpu'))>1:
+                attn = attn.mean(axis=-1)
+            assert len(attn.shape)==2
+            attn_dict[f'{option}_{feature}'] = attn
     return attn_dict
 
 def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
