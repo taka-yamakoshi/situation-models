@@ -44,7 +44,8 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
         num_heads = attention_layer.num_attention_heads
         head_dim = attention_layer.attention_head_size
         # if the intervention is layer only, apply the intervention first
-        if f'layer_{layer_id}' in interventions and f'key_{layer_id}' not in interventions\
+        if args.no_eq_len_condition\
+         and f'layer_{layer_id}' in interventions and f'key_{layer_id}' not in interventions\
          and f'query_{layer_id}' not in interventions and f'value_{layer_id}' not in interventions:
             for (pos,vec) in interventions[f'layer_{layer_id}']:
                 hidden = swap_vecs(hidden,pos,vec,args)
