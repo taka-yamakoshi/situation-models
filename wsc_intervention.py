@@ -22,7 +22,7 @@ def ExtractAttnLayer(layer_id,model,args):
         raise NotImplementedError("invalid model name")
     return layer
 
-def GetReps(layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
+def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
     assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     if rep_type=='layer':
@@ -61,7 +61,18 @@ def GetReps(layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
         return vec
     elif rep_type=='attention':
         mat = outputs[2][layer_id][0,head_id]
-        return mat
+        assert mat.shape[0]==mat.shape[1]
+        if args.intervention_type=='swap':
+            return mat
+        else:
+            patch = torch.zeros((len(token_ids['masks']),mat.shape[1])).to(args.device)
+            if args.intervention_type=='correct_option_attn':
+                correct_option = ['option_1','option_2'][context_id]
+                patch[:,token_ids[correct_option]] = 1/len(token_ids[correct_option])
+            elif args.intervention_type=='context_attn':
+                patch[:,token_ids['context']] = 1/len(token_ids['context'])
+            mat[token_ids['masks'],:] = patch.clone()
+            return mat
     else:
         raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
 
@@ -72,24 +83,25 @@ def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,t
         for masked_sent_id in [1,2]:
             for rep_type in rep_types:
                 if rep_type=='attention':
-                    if args.test:
-                        attn = GetReps(layer_id,head_id,'',rep_type,
+                    if args.test or args.intervention_type in ['correct_option_attn','context_attn']:
+                        attn = GetReps(context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                     token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
                     else:
-                        attn = GetReps(layer_id,head_id,'',rep_type,
+                        attn = GetReps(context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                     token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
                     interventions[f'masked_sent_{masked_sent_id}'][f'attention_{layer_id}_{head_id}'] = attn
                 else:
+                    assert args.intervention_type=='swap'
                     for pos_type in pos_types:
                         pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_type}']
                         if args.test:
-                            vec = GetReps(layer_id,head_id,pos_type,rep_type,
+                            vec = GetReps(context_id,layer_id,head_id,pos_type,rep_type,
                                         outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                         token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
                         else:
-                            vec = GetReps(layer_id,head_id,pos_type,rep_type,
+                            vec = GetReps(context_id,layer_id,head_id,pos_type,rep_type,
                                         outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                         token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
                         if pos_type!='context' or not args.no_eq_len_condition:
@@ -154,22 +166,24 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
         out_dict['original']['ave_2'] = choice_probs_ave_2
 
         for layer_id in range(model.config.num_hidden_layers):
-            if 'attention' in rep_types:
-                assert not args.no_eq_len_condition
-                for head_id in range(model.config.num_attention_heads):
-                    int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
-                    out_dict[f'layer_{layer_id}_{head_id}'] = {}
-                    out_dict[f'layer_{layer_id}_{head_id}']['sum_1'] = int_choice_probs_sum_1
-                    out_dict[f'layer_{layer_id}_{head_id}']['sum_2'] = int_choice_probs_sum_2
-                    out_dict[f'layer_{layer_id}_{head_id}']['ave_1'] = int_choice_probs_ave_1
-                    out_dict[f'layer_{layer_id}_{head_id}']['ave_2'] = int_choice_probs_ave_2
-            else:
-                int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,0,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
-                out_dict[f'layer_{layer_id}'] = {}
-                out_dict[f'layer_{layer_id}']['sum_1'] = int_choice_probs_sum_1
-                out_dict[f'layer_{layer_id}']['sum_2'] = int_choice_probs_sum_2
-                out_dict[f'layer_{layer_id}']['ave_1'] = int_choice_probs_ave_1
-                out_dict[f'layer_{layer_id}']['ave_2'] = int_choice_probs_ave_2
+            if str(layer_id) in args.layer.split('-') or args.layer=='all':
+                if 'attention' in rep_types:
+                    assert not args.no_eq_len_condition
+                    for head_id in range(model.config.num_attention_heads):
+                        if str(head_id) in args.head.split('-') or args.head=='all':
+                            int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
+                            out_dict[f'layer_{layer_id}_{head_id}'] = {}
+                            out_dict[f'layer_{layer_id}_{head_id}']['sum_1'] = int_choice_probs_sum_1
+                            out_dict[f'layer_{layer_id}_{head_id}']['sum_2'] = int_choice_probs_sum_2
+                            out_dict[f'layer_{layer_id}_{head_id}']['ave_1'] = int_choice_probs_ave_1
+                            out_dict[f'layer_{layer_id}_{head_id}']['ave_2'] = int_choice_probs_ave_2
+                else:
+                    int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,0,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
+                    out_dict[f'layer_{layer_id}'] = {}
+                    out_dict[f'layer_{layer_id}']['sum_1'] = int_choice_probs_sum_1
+                    out_dict[f'layer_{layer_id}']['sum_2'] = int_choice_probs_sum_2
+                    out_dict[f'layer_{layer_id}']['ave_1'] = int_choice_probs_ave_1
+                    out_dict[f'layer_{layer_id}']['ave_2'] = int_choice_probs_ave_2
         return out_dict
     else:
         return 'number of tokens did not match'
@@ -196,6 +210,9 @@ if __name__=='__main__':
     parser.add_argument('--core_id', type = int, default=0)
     parser.add_argument('--rep_type', type = str, required = True)
     parser.add_argument('--pos_type', type = str)
+    parser.add_argument('--layer', type = str, default='all')
+    parser.add_argument('--head', type = str, default='all')
+    parser.add_argument('--intervention_type',type=str,default='swap',choices=['swap','correct_option_attn','context_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
     parser.set_defaults(test=False,no_eq_len_condition=False)
@@ -204,6 +221,9 @@ if __name__=='__main__':
     #assert args.rep_type in ['layer','query','key','value','layer-query','key-value','layer-query-key-value']
     #assert args.pos_type in ['option_1','option_2','option_1-option_2','context','masks','period','cls','sep','cls-sep','cls-period-sep','option_1-option_2-context','other']
     print(f'running with {args}')
+
+    if 'attention' in args.rep_type.split('-'):
+        assert not args.no_eq_len_condition
 
     if args.pos_type is None:
         assert args.rep_type=='attention'
@@ -229,18 +249,24 @@ if __name__=='__main__':
 
     if args.pos_type is None:
         if args.dataset=='superglue':
-            with open(f'datafile/superglue_wsc_intervention_{args.rep_type}_{args.model}_{args.stimuli}{test_id}.pkl','wb') as f:
-                pickle.dump(out_dict,f)
+            out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
+                            +f'_{args.rep_type}_{args.model}_{args.stimuli}'\
+                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
         elif args.dataset=='winogrande':
-            with open(f'datafile/winogrande_{args.size}_intervention_{args.rep_type}_{args.model}{test_id}.pkl','wb') as f:
-                pickle.dump(out_dict,f)
+            out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
+                            +f'_{args.rep_type}_{args.model}'\
+                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
     else:
         if args.dataset=='superglue':
-            with open(f'datafile/superglue_wsc_intervention_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}{test_id}.pkl','wb') as f:
-                pickle.dump(out_dict,f)
+            out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
+                            +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}'\
+                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
         elif args.dataset=='winogrande':
-            with open(f'datafile/winogrande_{args.size}_intervention_{args.pos_type}_{args.rep_type}_{args.model}{test_id}.pkl','wb') as f:
-                pickle.dump(out_dict,f)
+            out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
+                            +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
+                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
+    with open(out_file_name,'wb') as f:
+        pickle.dump(out_dict,f)
 
     print(f'Time it took: {time.time()-start}')
     print(f'# sentences processed: {len(list(out_dict.keys()))}\n')
