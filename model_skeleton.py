@@ -88,6 +88,9 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
 
         z_rep_indiv = attn_mat@split_value
         z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*hidden.size())
+        if f'z_rep_{layer_id}' in interventions:
+            for (pos,vec) in interventions[f'z_rep_{layer_id}']:
+                z_rep = swap_vecs(z_rep,pos,vec,args)
 
         if args.model.startswith('bert') or args.model.startswith('roberta'):
             hidden_post_attn_res = layer.attention.output.dense(z_rep)+hidden # residual connection

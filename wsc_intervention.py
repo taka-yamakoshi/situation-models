@@ -9,6 +9,7 @@ from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel
 from model_skeleton import skeleton_model
 import pandas as pd
 import time
+import math
 
 def ExtractAttnLayer(layer_id,model,args):
     if args.model.startswith('bert'):
@@ -23,11 +24,11 @@ def ExtractAttnLayer(layer_id,model,args):
 
 def GetReps(layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
     assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
-    assert rep_type in ['layer','key','query','value','attention']
+    assert rep_type in ['layer','key','query','value','attention','z_rep']
     if rep_type=='layer':
         vec = outputs[1][layer_id][0,token_ids[f'{pos_type}']]
         return vec
-    elif rep_type in ['key','query','value']:
+    elif rep_type in ['key','query','value','z_rep']:
         attn_layer = ExtractAttnLayer(layer_id,model,args)
         if rep_type=='key':
             key = attn_layer.key(outputs[1][layer_id])
@@ -38,6 +39,25 @@ def GetReps(layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
         elif rep_type=='value':
             value = attn_layer.value(outputs[1][layer_id])
             vec = value[0,token_ids[f'{pos_type}']]
+        elif rep_type=='z_rep':
+            if args.model.startswith('bert') or args.model.startswith('roberta'):
+                z_rep = attn_layer(outputs[1][layer_id])
+            elif args.model.startswith('albert'):
+                num_heads = attn_layer.num_attention_heads
+                head_dim = attn_layer.attention_head_size
+
+                key = attn_layer.key(outputs[1][layer_id])
+                query = attn_layer.query(outputs[1][layer_id])
+                value = attn_layer.value(outputs[1][layer_id])
+
+                split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+                split_query = query.view(*(query.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+                split_value = value.view(*(value.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+
+                attn_mat = F.softmax(split_query@split_key.permute(0,1,3,2)/math.sqrt(head_dim),dim=-1)
+                z_rep_indiv = attn_mat@split_value
+                z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*outputs[1][layer_id].size())
+            vec = z_rep[0,token_ids[f'{pos_type}']]
         return vec
     elif rep_type=='attention':
         mat = outputs[2][layer_id][0,head_id]
