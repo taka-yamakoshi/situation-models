@@ -22,6 +22,12 @@ def ExtractAttnLayer(layer_id,model,args):
         raise NotImplementedError("invalid model name")
     return layer
 
+def FixAttn(mat,token_ids,in_pos,out_pos,args):
+    patch = torch.zeros((len(token_ids[out_pos]),mat.shape[1])).to(args.device)
+    patch[:,token_ids[in_pos]] = 1/len(token_ids[in_pos])
+    mat[token_ids[out_pos],:] = patch.clone()
+    return mat
+
 def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
     assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
@@ -65,13 +71,17 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
         if args.intervention_type=='swap':
             return mat
         else:
-            patch = torch.zeros((len(token_ids['masks']),mat.shape[1])).to(args.device)
+            correct_option = ['option_1','option_2'][context_id]
             if args.intervention_type=='correct_option_attn':
-                correct_option = ['option_1','option_2'][context_id]
-                patch[:,token_ids[correct_option]] = 1/len(token_ids[correct_option])
+                mat = FixAttn(mat,token_ids,correct_option,'masks',args)
             elif args.intervention_type=='context_attn':
-                patch[:,token_ids['context']] = 1/len(token_ids['context'])
-            mat[token_ids['masks'],:] = patch.clone()
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+            elif args.intervention_type=='context_context_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+            elif args.intervention_type=='context_masks_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
             return mat
     else:
         raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
@@ -83,7 +93,7 @@ def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,t
         for masked_sent_id in [1,2]:
             for rep_type in rep_types:
                 if rep_type=='attention':
-                    if args.test or args.intervention_type in ['correct_option_attn','context_attn']:
+                    if args.test or args.intervention_type!='swap':
                         attn = GetReps(context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                     token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
@@ -212,7 +222,8 @@ if __name__=='__main__':
     parser.add_argument('--pos_type', type = str)
     parser.add_argument('--layer', type = str, default='all')
     parser.add_argument('--head', type = str, default='all')
-    parser.add_argument('--intervention_type',type=str,default='swap',choices=['swap','correct_option_attn','context_attn'])
+    parser.add_argument('--intervention_type',type=str,default='swap',
+                        choices=['swap','correct_option_attn','context_attn','context_context_attn','context_masks_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
     parser.set_defaults(test=False,no_eq_len_condition=False)
