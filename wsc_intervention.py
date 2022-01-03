@@ -76,6 +76,10 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
                 mat = FixAttn(mat,token_ids,correct_option,'masks',args)
             elif args.intervention_type=='context_attn':
                 mat = FixAttn(mat,token_ids,'context','masks',args)
+            elif args.intervention_type=='option_context_attn':
+                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+            elif args.intervention_type=='option_masks_attn':
+                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
             elif args.intervention_type=='context_context_attn':
                 mat = FixAttn(mat,token_ids,'context','masks',args)
                 mat = FixAttn(mat,token_ids,'context',correct_option,args)
@@ -223,7 +227,9 @@ if __name__=='__main__':
     parser.add_argument('--layer', type = str, default='all')
     parser.add_argument('--head', type = str, default='all')
     parser.add_argument('--intervention_type',type=str,default='swap',
-                        choices=['swap','correct_option_attn','context_attn','context_context_attn','context_masks_attn'])
+                        choices=['swap','correct_option_attn','context_attn',
+                                'option_context_attn','option_masks_attn',
+                                'context_context_attn','context_masks_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
     parser.set_defaults(test=False,no_eq_len_condition=False)
