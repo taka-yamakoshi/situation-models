@@ -35,7 +35,7 @@ if __name__=='__main__':
     model, tokenizer, mask_id, args = LoadModel(args)
 
     out_dict = {}
-    for line in text[:500]:
+    for line in text[:100]:
         out_dict[line[head.index('pair_id')]] = {}
         outputs_1, token_ids_1, option_tokens_list_1, masked_sents_1 = CalcOutputs(head,line,1,model,tokenizer,mask_id,args)
         #out_dict[line[head.index('pair_id')]]['probs_1'] = [output[0].to('cpu') for output in outputs_1]
