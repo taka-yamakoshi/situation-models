@@ -22,9 +22,13 @@ def ExtractAttnLayer(layer_id,model,args):
         raise NotImplementedError("invalid model name")
     return layer
 
-def FixAttn(mat,token_ids,in_pos,out_pos,args):
-    patch = torch.zeros((len(token_ids[out_pos]),mat.shape[1])).to(args.device)
-    patch[:,token_ids[in_pos]] = 1/len(token_ids[in_pos])
+def FixAttn(mat,token_ids,in_pos,out_pos,args,reverse=False):
+    if reverse:
+        patch = torch.ones((len(token_ids[out_pos]),mat.shape[1])).to(args.device)/(mat.shape[1]-len(token_ids[in_pos]))
+        patch[:,token_ids[in_pos]] = 0
+    else:
+        patch = torch.zeros((len(token_ids[out_pos]),mat.shape[1])).to(args.device)
+        patch[:,token_ids[in_pos]] = 1/len(token_ids[in_pos])
     mat[token_ids[out_pos],:] = patch.clone()
     return mat
 
@@ -72,8 +76,11 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
             return mat
         else:
             correct_option = ['option_1','option_2'][context_id]
+            incorrect_option = ['option_2','option_1'][context_id]
             if args.intervention_type=='correct_option_attn':
                 mat = FixAttn(mat,token_ids,correct_option,'masks',args)
+            elif args.intervention_type=='incorrect_option_attn':
+                mat = FixAttn(mat,token_ids,incorrect_option,'masks',args)
             elif args.intervention_type=='context_attn':
                 mat = FixAttn(mat,token_ids,'context','masks',args)
             elif args.intervention_type=='option_context_attn':
@@ -86,6 +93,10 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
             elif args.intervention_type=='context_masks_attn':
                 mat = FixAttn(mat,token_ids,'context','masks',args)
                 mat = FixAttn(mat,token_ids,'masks',correct_option,args)
+            elif args.intervention_type=='lesion_context_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args,reverse=True)
+            else:
+                raise NotImplementedError(f'invalid intervention type: {args.intervention_type}')
             return mat
     else:
         raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
@@ -227,9 +238,9 @@ if __name__=='__main__':
     parser.add_argument('--layer', type = str, default='all')
     parser.add_argument('--head', type = str, default='all')
     parser.add_argument('--intervention_type',type=str,default='swap',
-                        choices=['swap','correct_option_attn','context_attn',
+                        choices=['swap','correct_option_attn','incorrect_option_attn','context_attn',
                                 'option_context_attn','option_masks_attn',
-                                'context_context_attn','context_masks_attn'])
+                                'context_context_attn','context_masks_attn','lesion_context_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
     parser.set_defaults(test=False,no_eq_len_condition=False)
