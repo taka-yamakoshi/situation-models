@@ -106,10 +106,11 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
     else:
         raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
 
-def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args,verbose=False):
-    interventions_all = []
+def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
+    if len(interventions)==0:
+        interventions = [{'masked_sent_1':{},'masked_sent_2':{}} for _ in range(2)]
+    assert len(interventions)==2
     for context_id in range(2):
-        interventions = {'masked_sent_1':{},'masked_sent_2':{}}
         for masked_sent_id in [1,2]:
             for rep_type in rep_types:
                 if rep_type=='attention':
@@ -121,7 +122,8 @@ def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,t
                         attn = GetReps(context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                     token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
-                    interventions[f'masked_sent_{masked_sent_id}'][f'attention_{layer_id}_{head_id}'] = attn
+                    assert f'attention_{layer_id}_{head_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']
+                    interventions[context_id][f'masked_sent_{masked_sent_id}'][f'attention_{layer_id}_{head_id}'] = attn
                 else:
                     assert args.intervention_type=='swap'
                     for pos_type in pos_types:
@@ -136,22 +138,27 @@ def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,t
                                         token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
                         if pos_type!='context' or not args.no_eq_len_condition:
                             assert len(pos)==len(vec)
-                        if f'{rep_type}_{layer_id}' not in interventions[f'masked_sent_{masked_sent_id}']:
-                            interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
-                        interventions[f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos,vec)])
-        interventions_all.append(interventions)
-
+                        if f'{rep_type}_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
+                            interventions[context_id][f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'] = []
+                        interventions[context_id][f'masked_sent_{masked_sent_id}'][f'{rep_type}_{layer_id}'].extend([(pos,vec)])
     if verbose:
-        for intervention in [interventions_all[0]['masked_sent_1'],interventions_all[0]['masked_sent_2'],interventions_all[1]['masked_sent_1'],interventions_all[1]['masked_sent_2']]:
+        for intervention in [interventions[0]['masked_sent_1'],interventions[0]['masked_sent_2'],interventions[1]['masked_sent_1'],interventions[1]['masked_sent_2']]:
             for key,value in intervention.items():
                 print(key)
                 for pair in value:
                     print(pair[0],pair[1].shape)
+    return interventions
 
-    int_logits_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],model,interventions_all[0]['masked_sent_1'],args)
-    int_logits_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],model,interventions_all[0]['masked_sent_2'],args)
-    int_logits_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],model,interventions_all[1]['masked_sent_1'],args)
-    int_logits_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],model,interventions_all[1]['masked_sent_2'],args)
+
+def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args):
+    int_logits_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],
+                                            model,interventions[0]['masked_sent_1'],args)
+    int_logits_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],
+                                            model,interventions[0]['masked_sent_2'],args)
+    int_logits_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],
+                                            model,interventions[1]['masked_sent_1'],args)
+    int_logits_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],
+                                            model,interventions[1]['masked_sent_2'],args)
 
     if 'context' in pos_types and not args.test:
         token_ids_new_1 = token_ids[1]
@@ -163,11 +170,17 @@ def ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,t
     option_tokens_list_1 = option_tokens_lists[0]
     option_tokens_list_2 = option_tokens_lists[1]
 
-    choice_probs_sum_1,choice_probs_ave_1 = EvaluatePredictions(int_logits_1_context_1,int_logits_2_context_1,token_ids_new_1,option_tokens_list_1,args)
-    choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_logits_1_context_2,int_logits_2_context_2,token_ids_new_2,option_tokens_list_2,args)
+    choice_probs_sum_1,choice_probs_ave_1 = EvaluatePredictions(int_logits_1_context_1,int_logits_2_context_1,
+                                                                token_ids_new_1,option_tokens_list_1,args)
+    choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_logits_1_context_2,int_logits_2_context_2,
+                                                                token_ids_new_2,option_tokens_list_2,args)
 
-    return choice_probs_sum_1,choice_probs_ave_1,choice_probs_sum_2,choice_probs_ave_2
-
+    results = {}
+    results['sum_1'] = choice_probs_sum_1
+    results['sum_2'] = choice_probs_sum_2
+    results['ave_1'] = choice_probs_ave_1
+    results['ave_2'] = choice_probs_ave_2
+    return results
 
 def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,args):
     assert int(line[head.index('option_1_word_id_1')]) < int(line[head.index('option_2_word_id_1')])
@@ -184,7 +197,7 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
         outputs['masked_sent_2_context_2'] = outputs_2[1]
 
         token_ids = [token_ids_1, token_ids_2]
-        option_tokens_lists = [option_tokens_list_1,option_tokens_list_2]
+        option_tokens_lists = [option_tokens_list_1, option_tokens_list_2]
 
         out_dict = {}
         choice_probs_sum_1, choice_probs_ave_1 = EvaluatePredictions(outputs_1[0][0],outputs_1[1][0],token_ids_1,option_tokens_list_1,args)
@@ -197,23 +210,51 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
 
         for layer_id in range(model.config.num_hidden_layers):
             if str(layer_id) in args.layer.split('-') or args.layer=='all':
-                if 'attention' in rep_types:
+                if 'attention' in rep_types and args.multihead:
+                    assert not args.no_eq_len_condition
+                    interventions = []
+                    for head_id in range(model.config.num_attention_heads):
+                        if str(head_id) in args.head.split('-') or args.head=='all':
+                            if args.cascade:
+                                # include interventions for preceding layers
+                                for pre_layer_id in range(layer_id):
+                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
+                                                                            outputs,token_ids,args)
+                            interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
+                                                                outputs,token_ids,args)
+                    assert f'layer_{layer_id}' not in out_dict
+                    out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                            outputs,token_ids,option_tokens_lists,args)
+                elif 'attention' in rep_types and not args.multihead:
                     assert not args.no_eq_len_condition
                     for head_id in range(model.config.num_attention_heads):
                         if str(head_id) in args.head.split('-') or args.head=='all':
-                            int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,head_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
-                            out_dict[f'layer_{layer_id}_{head_id}'] = {}
-                            out_dict[f'layer_{layer_id}_{head_id}']['sum_1'] = int_choice_probs_sum_1
-                            out_dict[f'layer_{layer_id}_{head_id}']['sum_2'] = int_choice_probs_sum_2
-                            out_dict[f'layer_{layer_id}_{head_id}']['ave_1'] = int_choice_probs_ave_1
-                            out_dict[f'layer_{layer_id}_{head_id}']['ave_2'] = int_choice_probs_ave_2
+                            interventions = []
+                            if args.cascade:
+                                # include interventions for preceding layers
+                                for pre_layer_id in range(layer_id):
+                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
+                                                                            outputs,token_ids,args)
+                            interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
+                                                                outputs,token_ids,args)
+                            assert f'layer_{layer_id}_{head_id}' not in out_dict
+                            out_dict[f'layer_{layer_id}_{head_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                                                outputs,token_ids,option_tokens_lists,args)
                 else:
-                    int_choice_probs_sum_1,int_choice_probs_ave_1,int_choice_probs_sum_2,int_choice_probs_ave_2 = ApplyInterventionsLayer(model,layer_id,0,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args)
-                    out_dict[f'layer_{layer_id}'] = {}
-                    out_dict[f'layer_{layer_id}']['sum_1'] = int_choice_probs_sum_1
-                    out_dict[f'layer_{layer_id}']['sum_2'] = int_choice_probs_sum_2
-                    out_dict[f'layer_{layer_id}']['ave_1'] = int_choice_probs_ave_1
-                    out_dict[f'layer_{layer_id}']['ave_2'] = int_choice_probs_ave_2
+                    interventions = []
+                    if args.cascade:
+                        # include interventions for preceding layers
+                        for pre_layer_id in range(layer_id):
+                            if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                interventions = CreateInterventions(interventions,pre_layer_id,None,pos_types,rep_types,
+                                                                    outputs,token_ids,args)
+                    interventions = CreateInterventions(interventions,layer_id,None,pos_types,rep_types,
+                                                        outputs,token_ids,args)
+                    assert f'layer_{layer_id}' not in out_dict
+                    out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                            outputs,token_ids,option_tokens_lists,args)
         return out_dict
     else:
         return 'number of tokens did not match'
@@ -250,7 +291,9 @@ if __name__=='__main__':
                                 'lesion_context_attn','lesion_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
-    parser.set_defaults(test=False,no_eq_len_condition=False)
+    parser.add_argument('--cascade',dest='cascade',action='store_true')
+    parser.add_argument('--multihead',dest='multihead',action='store_true')
+    parser.set_defaults(test=False,no_eq_len_condition=False,cascade=False,multihead=False)
     args = parser.parse_args()
     # context and masks perturbations should be the last since they may change the sentence length
     #assert args.rep_type in ['layer','query','key','value','layer-query','key-value','layer-query-key-value']
@@ -267,6 +310,14 @@ if __name__=='__main__':
         test_id = '_test'
     else:
         test_id = ''
+    if args.cascade:
+        cascade_id = '_cascade'
+    else:
+        cascade_id = ''
+    if args.multihead:
+        multihead_id = '_multihead'
+    else:
+        multihead_id = ''
 
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
@@ -286,20 +337,20 @@ if __name__=='__main__':
         if args.dataset=='superglue':
             out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}_{args.stimuli}'\
-                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
         elif args.dataset=='winogrande':
             out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}'\
-                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
     else:
         if args.dataset=='superglue':
             out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}'\
-                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
         elif args.dataset=='winogrande':
             out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
-                            +f'_layer_{args.layer}_head_{args.head}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
     with open(out_file_name,'wb') as f:
         pickle.dump(out_dict,f)
 
