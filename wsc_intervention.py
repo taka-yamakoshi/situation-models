@@ -215,14 +215,14 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                     interventions = []
                     for head_id in range(model.config.num_attention_heads):
                         if str(head_id) in args.head.split('-') or args.head=='all':
-                            if args.cascade:
-                                # include interventions for preceding layers
-                                for pre_layer_id in range(layer_id):
-                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
-                                                                            outputs,token_ids,args)
                             interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
                                                                 outputs,token_ids,args)
+                            if args.cascade:
+                                # include interventions for later layers
+                                for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
+                                    if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,post_layer_id,head_id,pos_types,rep_types,
+                                                                            outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
                     out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
                                                                             outputs,token_ids,option_tokens_lists,args)
@@ -231,27 +231,27 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                     for head_id in range(model.config.num_attention_heads):
                         if str(head_id) in args.head.split('-') or args.head=='all':
                             interventions = []
-                            if args.cascade:
-                                # include interventions for preceding layers
-                                for pre_layer_id in range(layer_id):
-                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
-                                                                            outputs,token_ids,args)
                             interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
                                                                 outputs,token_ids,args)
+                            if args.cascade:
+                                # include interventions for later layers
+                                for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
+                                    if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,post_layer_id,head_id,pos_types,rep_types,
+                                                                            outputs,token_ids,args)
                             assert f'layer_{layer_id}_{head_id}' not in out_dict
                             out_dict[f'layer_{layer_id}_{head_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
                                                                                                 outputs,token_ids,option_tokens_lists,args)
                 else:
                     interventions = []
-                    if args.cascade:
-                        # include interventions for preceding layers
-                        for pre_layer_id in range(layer_id):
-                            if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                interventions = CreateInterventions(interventions,pre_layer_id,None,pos_types,rep_types,
-                                                                    outputs,token_ids,args)
                     interventions = CreateInterventions(interventions,layer_id,None,pos_types,rep_types,
                                                         outputs,token_ids,args)
+                    if args.cascade:
+                        # include interventions for later layers
+                        for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
+                            if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
+                                interventions = CreateInterventions(interventions,post_layer_id,None,pos_types,rep_types,
+                                                                    outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
                     out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
                                                                             outputs,token_ids,option_tokens_lists,args)
