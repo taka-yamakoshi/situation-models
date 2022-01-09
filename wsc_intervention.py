@@ -219,13 +219,17 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                                                                 outputs,token_ids,args)
                             if args.cascade:
                                 # include interventions for later layers
-                                for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
-                                    if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,post_layer_id,head_id,pos_types,rep_types,
+                                for pre_layer_id in range(layer_id):
+                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
                                                                             outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
-                    out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
-                                                                            outputs,token_ids,option_tokens_lists,args)
+                    if args.cascade:
+                        out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,0,pos_types,rep_types,
+                                                                                outputs,token_ids,option_tokens_lists,args)
+                    else:
+                        out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                                outputs,token_ids,option_tokens_lists,args)
                 elif 'attention' in rep_types and not args.multihead:
                     assert not args.no_eq_len_condition
                     for head_id in range(model.config.num_attention_heads):
@@ -235,26 +239,34 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                                                                 outputs,token_ids,args)
                             if args.cascade:
                                 # include interventions for later layers
-                                for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
-                                    if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,post_layer_id,head_id,pos_types,rep_types,
+                                for pre_layer_id in range(layer_id):
+                                    if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
                                                                             outputs,token_ids,args)
                             assert f'layer_{layer_id}_{head_id}' not in out_dict
-                            out_dict[f'layer_{layer_id}_{head_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
-                                                                                                outputs,token_ids,option_tokens_lists,args)
+                            if args.cascade:
+                                out_dict[f'layer_{layer_id}_{head_id}'] = ApplyInterventionsLayer(interventions,model,0,pos_types,rep_types,
+                                                                                                    outputs,token_ids,option_tokens_lists,args)
+                            else:
+                                out_dict[f'layer_{layer_id}_{head_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                                                    outputs,token_ids,option_tokens_lists,args)
                 else:
                     interventions = []
                     interventions = CreateInterventions(interventions,layer_id,None,pos_types,rep_types,
                                                         outputs,token_ids,args)
                     if args.cascade:
                         # include interventions for later layers
-                        for post_layer_id in range(layer_id+1,model.config.num_hidden_layers):
-                            if str(post_layer_id) in args.layer.split('-') or args.layer=='all':
-                                interventions = CreateInterventions(interventions,post_layer_id,None,pos_types,rep_types,
+                        for pre_layer_id in range(layer_id):
+                            if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
+                                interventions = CreateInterventions(interventions,pre_layer_id,None,pos_types,rep_types,
                                                                     outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
-                    out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
-                                                                            outputs,token_ids,option_tokens_lists,args)
+                    if args.cascade:
+                        out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,0,pos_types,rep_types,
+                                                                                outputs,token_ids,option_tokens_lists,args)
+                    else:
+                        out_dict[f'layer_{layer_id}'] = ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,
+                                                                                outputs,token_ids,option_tokens_lists,args)
         return out_dict
     else:
         return 'number of tokens did not match'
