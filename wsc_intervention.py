@@ -33,6 +33,14 @@ def FixAttn(mat,token_ids,in_pos,out_pos,args,reverse=False):
         mat[token_ids[out_pos],:] = patch.clone()
     return mat
 
+def ScrambleAttn(mat,token_ids,out_pos,args):
+    if not args.test:
+        rand_ids = np.random.permutation(mat.shape[1])
+        patch = torch.tensor([[mat[out_pos_id][rand_id] for rand_id in rand_ids]
+                            for out_pos_id in token_ids[out_pos]]).to(args.device)
+        mat[token_ids[out_pos],:] = patch.clone()
+    return mat
+
 def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
     assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
@@ -100,6 +108,8 @@ def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args
                 mat = FixAttn(mat,token_ids,'context','masks',args,reverse=True)
             elif args.intervention_type=='lesion_attn':
                 mat = torch.zeros(mat.size()).to(args.device)
+            elif args.intervention_type=='scramble_masks_attn':
+                mat = ScrambleAttn(mat,token_ids,'masks',args)
             else:
                 raise NotImplementedError(f'invalid intervention type: {args.intervention_type}')
             return mat
@@ -300,7 +310,8 @@ if __name__=='__main__':
                                 'context_attn','other_attn',
                                 'option_context_attn','option_masks_attn',
                                 'context_context_attn','context_masks_attn',
-                                'lesion_context_attn','lesion_attn'])
+                                'lesion_context_attn','lesion_attn',
+                                'scramble_masks_attn'])
     parser.add_argument('--test',dest='test',action='store_true')
     parser.add_argument('--no_eq_len_condition',dest='no_eq_len_condition',action='store_true')
     parser.add_argument('--cascade',dest='cascade',action='store_true')
