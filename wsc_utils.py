@@ -238,3 +238,78 @@ def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
     choice_probs_ave = [np.mean([probs_1[0,token_id,token].item() for token_id,token in enumerate(tokens_list[0])]),
                         np.mean([probs_2[0,token_id,token].item() for token_id,token in enumerate(tokens_list[1])])]
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
+
+def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
+    assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
+    assert rep_type in ['layer','key','query','value','attention','z_rep']
+    if rep_type=='layer':
+        vec = outputs[1][layer_id][0,token_ids[f'{pos_type}']]
+        return vec
+    elif rep_type in ['key','query','value','z_rep']:
+        attn_layer = ExtractAttnLayer(layer_id,model,args)
+        if rep_type=='key':
+            key = attn_layer.key(outputs[1][layer_id])
+            vec = key[0,token_ids[f'{pos_type}']]
+        elif rep_type=='query':
+            query = attn_layer.query(outputs[1][layer_id])
+            vec = query[0,token_ids[f'{pos_type}']]
+        elif rep_type=='value':
+            value = attn_layer.value(outputs[1][layer_id])
+            vec = value[0,token_ids[f'{pos_type}']]
+        elif rep_type=='z_rep':
+            if args.model.startswith('bert') or args.model.startswith('roberta'):
+                z_rep = attn_layer(outputs[1][layer_id])
+            elif args.model.startswith('albert'):
+                num_heads = attn_layer.num_attention_heads
+                head_dim = attn_layer.attention_head_size
+
+                key = attn_layer.key(outputs[1][layer_id])
+                query = attn_layer.query(outputs[1][layer_id])
+                value = attn_layer.value(outputs[1][layer_id])
+
+                split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+                split_query = query.view(*(query.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+                split_value = value.view(*(value.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+
+                attn_mat = F.softmax(split_query@split_key.permute(0,1,3,2)/math.sqrt(head_dim),dim=-1)
+                z_rep_indiv = attn_mat@split_value
+                z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*outputs[1][layer_id].size())
+            vec = z_rep[0,token_ids[f'{pos_type}']]
+        return vec
+    elif rep_type=='attention':
+        mat = outputs[2][layer_id][0,head_id]
+        assert mat.shape[0]==mat.shape[1]
+        if args.intervention_type=='swap':
+            return mat
+        else:
+            correct_option = ['option_1','option_2'][context_id]
+            incorrect_option = ['option_2','option_1'][context_id]
+            if args.intervention_type=='correct_option_attn':
+                mat = FixAttn(mat,token_ids,correct_option,'masks',args)
+            elif args.intervention_type=='incorrect_option_attn':
+                mat = FixAttn(mat,token_ids,incorrect_option,'masks',args)
+            elif args.intervention_type=='context_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+            elif args.intervention_type=='other_attn':
+                mat = FixAttn(mat,token_ids,'other','masks',args)
+            elif args.intervention_type=='option_context_attn':
+                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+            elif args.intervention_type=='option_masks_attn':
+                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
+            elif args.intervention_type=='context_context_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+            elif args.intervention_type=='context_masks_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args)
+                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
+            elif args.intervention_type=='lesion_context_attn':
+                mat = FixAttn(mat,token_ids,'context','masks',args,reverse=True)
+            elif args.intervention_type=='lesion_attn':
+                mat = torch.zeros(mat.size()).to(args.device)
+            elif args.intervention_type=='scramble_masks_attn':
+                mat = ScrambleAttn(mat,token_ids,'masks',args)
+            else:
+                raise NotImplementedError(f'invalid intervention type: {args.intervention_type}')
+            return mat
+    else:
+        raise NotImplementedError(f'rep_type "{rep_type}" is not supported')

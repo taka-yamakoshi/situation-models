@@ -22,6 +22,17 @@ def args_setup_deberta(args,init_shape):
     args.attention_mask = args.encoder.get_attention_mask(args.attention_mask).to(args.device)
     return args
 
+def ExtractAttnLayer(layer_id,model,args):
+    if args.model.startswith('bert'):
+        layer = model.bert.encoder.layer[layer_id].attention.self
+    elif args.model.startswith('roberta'):
+        layer = model.roberta.encoder.layer[layer_id].attention.self
+    elif args.model.startswith('albert'):
+        layer = model.albert.encoder.albert_layer_groups[0].albert_layers[0].attention
+    else:
+        raise NotImplementedError("invalid model name")
+    return layer
+
 @torch.no_grad()
 def layer_intervention(layer_id,layer,interventions,hidden,args):
     if args.model.startswith('deberta'):
