@@ -221,6 +221,8 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,other,aligned
     output_token_ids['period'] = torch.tensor([aligned_token_ids['period']]).to(args.device)
     output_token_ids['cls'] = torch.tensor([0]).to(args.device)
     output_token_ids['sep'] = torch.tensor([-1]).to(args.device)
+    output_token_ids['options'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]
+                                                +[i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
 
     return output_token_ids
 
@@ -239,13 +241,14 @@ def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
                         np.mean([probs_2[0,token_id,token].item() for token_id,token in enumerate(tokens_list[1])])]
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
-def GetReps(context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
-    assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other']
+def GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
+    assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other','options']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     if rep_type=='layer':
         vec = outputs[1][layer_id][0,token_ids[f'{pos_type}']]
         return vec
     elif rep_type in ['key','query','value','z_rep']:
+        from model_skeleton import ExtractAttnLayer
         attn_layer = ExtractAttnLayer(layer_id,model,args)
         if rep_type=='key':
             key = attn_layer.key(outputs[1][layer_id])

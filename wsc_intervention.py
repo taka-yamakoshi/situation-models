@@ -30,7 +30,7 @@ def ScrambleAttn(mat,token_ids,out_pos,args):
         mat[token_ids[out_pos],:] = patch.clone()
     return mat
 
-def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
+def CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
     if len(interventions)==0:
         interventions = [{'masked_sent_1':{},'masked_sent_2':{}} for _ in range(2)]
     assert len(interventions)==2
@@ -39,11 +39,11 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
             for rep_type in rep_types:
                 if rep_type=='attention':
                     if args.test or args.intervention_type!='swap':
-                        attn = GetReps(context_id,layer_id,head_id,'',rep_type,
+                        attn = GetReps(model,context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                     token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
                     else:
-                        attn = GetReps(context_id,layer_id,head_id,'',rep_type,
+                        attn = GetReps(model,context_id,layer_id,head_id,'',rep_type,
                                     outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                     token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
                     assert f'attention_{layer_id}_{head_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']
@@ -54,19 +54,23 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
                     k_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[0]}']
                     q_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[1]}']
                     if args.test:
-                        k_vec = GetReps(context_id,layer_id,head_id,pos_types[0],'key',
+                        k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[0],'key',
                                     outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                     token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
-                        q_vec = GetReps(context_id,layer_id,head_id,pos_types[1],'query',
+                        q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[1],'query',
                                     outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                     token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
                     else:
-                        k_vec = GetReps(context_id,layer_id,head_id,pos_types[0],'key',
+                        k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[0],'key',
                                     outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                     token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
-                        q_vec = GetReps(context_id,layer_id,head_id,pos_types[1],'query',
+                        q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[1],'query',
                                     outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                     token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
+                    if pos_types[0]!='context' or not args.no_eq_len_condition:
+                        assert len(k_pos)==len(k_vec)
+                    if pos_types[1]!='context' or not args.no_eq_len_condition:
+                        assert len(q_pos)==len(q_vec)
                     if f'key_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
                         interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'] = []
                     interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'].extend([(k_pos,k_vec)])
@@ -78,11 +82,11 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
                     for pos_type in pos_types:
                         pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_type}']
                         if args.test:
-                            vec = GetReps(context_id,layer_id,head_id,pos_type,rep_type,
+                            vec = GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,
                                         outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
                                         token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
                         else:
-                            vec = GetReps(context_id,layer_id,head_id,pos_type,rep_type,
+                            vec = GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,
                                         outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
                                         token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
                         if pos_type!='context' or not args.no_eq_len_condition:
@@ -164,13 +168,13 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                     interventions = []
                     for head_id in range(model.config.num_attention_heads):
                         if str(head_id) in args.head.split('-') or args.head=='all':
-                            interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
+                            interventions = CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types,
                                                                 outputs,token_ids,args)
                             if args.cascade:
                                 # include interventions for later layers
                                 for pre_layer_id in range(layer_id):
                                     if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
+                                        interventions = CreateInterventions(model,interventions,pre_layer_id,head_id,pos_types,rep_types,
                                                                             outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
                     if args.cascade:
@@ -184,13 +188,13 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                     for head_id in range(model.config.num_attention_heads):
                         if str(head_id) in args.head.split('-') or args.head=='all':
                             interventions = []
-                            interventions = CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,
+                            interventions = CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types,
                                                                 outputs,token_ids,args)
                             if args.cascade:
                                 # include interventions for later layers
                                 for pre_layer_id in range(layer_id):
                                     if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                        interventions = CreateInterventions(interventions,pre_layer_id,head_id,pos_types,rep_types,
+                                        interventions = CreateInterventions(model,interventions,pre_layer_id,head_id,pos_types,rep_types,
                                                                             outputs,token_ids,args)
                             assert f'layer_{layer_id}_{head_id}' not in out_dict
                             if args.cascade:
@@ -201,13 +205,13 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                                                                                                     outputs,token_ids,option_tokens_lists,args)
                 else:
                     interventions = []
-                    interventions = CreateInterventions(interventions,layer_id,None,pos_types,rep_types,
+                    interventions = CreateInterventions(model,interventions,layer_id,None,pos_types,rep_types,
                                                         outputs,token_ids,args)
                     if args.cascade:
                         # include interventions for later layers
                         for pre_layer_id in range(layer_id):
                             if str(pre_layer_id) in args.layer.split('-') or args.layer=='all':
-                                interventions = CreateInterventions(interventions,pre_layer_id,None,pos_types,rep_types,
+                                interventions = CreateInterventions(model,interventions,pre_layer_id,None,pos_types,rep_types,
                                                                     outputs,token_ids,args)
                     assert f'layer_{layer_id}' not in out_dict
                     if args.cascade:
