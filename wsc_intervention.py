@@ -11,25 +11,6 @@ import pandas as pd
 import time
 import math
 
-def FixAttn(mat,token_ids,in_pos,out_pos,args,reverse=False):
-    if not args.test:
-        if reverse:
-            patch = torch.ones((len(token_ids[out_pos]),mat.shape[1])).to(args.device)/(mat.shape[1]-len(token_ids[in_pos]))
-            patch[:,token_ids[in_pos]] = 0
-        else:
-            patch = torch.zeros((len(token_ids[out_pos]),mat.shape[1])).to(args.device)
-            patch[:,token_ids[in_pos]] = 1/len(token_ids[in_pos])
-        mat[token_ids[out_pos],:] = patch.clone()
-    return mat
-
-def ScrambleAttn(mat,token_ids,out_pos,args):
-    if not args.test:
-        rand_ids = np.random.permutation(mat.shape[1])
-        patch = torch.tensor([[mat[out_pos_id][rand_id] for rand_id in rand_ids]
-                            for out_pos_id in token_ids[out_pos]]).to(args.device)
-        mat[token_ids[out_pos],:] = patch.clone()
-    return mat
-
 def CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
     if len(interventions)==0:
         interventions = [{'masked_sent_1':{},'masked_sent_2':{}} for _ in range(2)]
