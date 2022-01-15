@@ -232,8 +232,8 @@ def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
         probs_1 = F.log_softmax(logits_1[:, pron_token_id:(pron_token_id+len(tokens_list[0]))], dim = -1).to('cpu')
         probs_2 = F.log_softmax(logits_2[:, pron_token_id:(pron_token_id+len(tokens_list[1]))], dim = -1).to('cpu')
     elif 'gpt2' in args.model:
-        probs_1 = F.log_softmax(logits_1, dim = -1).to('cpu')
-        probs_2 = F.log_softmax(logits_2, dim = -1).to('cpu')
+        probs_1 = F.log_softmax(logits_1[:,:-1], dim = -1).to('cpu')
+        probs_2 = F.log_softmax(logits_2[:,:-1], dim = -1).to('cpu')
     assert probs_1.shape[1]==len(tokens_list[0]) and probs_2.shape[1]==len(tokens_list[1])
     choice_probs_sum = [np.sum([probs_1[0,token_id,token].item() for token_id,token in enumerate(tokens_list[0])]),
                         np.sum([probs_2[0,token_id,token].item() for token_id,token in enumerate(tokens_list[1])])]

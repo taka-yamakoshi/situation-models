@@ -13,7 +13,7 @@ def CalcPrediction(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=F
     if 'bert' in args.model:
         tokens_list = option_tokens_list
     elif 'gpt2' in args.model:
-        tokens_list = [masked_sent[0] for masked_sent in masked_sents]
+        tokens_list = [masked_sent[0][1:] for masked_sent in masked_sents]
     return EvaluatePredictions(outputs[0][0],outputs[1][0],token_ids,tokens_list,args)
 
 if __name__=='__main__':
