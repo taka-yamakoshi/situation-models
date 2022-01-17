@@ -31,33 +31,35 @@ def CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types
                     interventions[context_id][f'masked_sent_{masked_sent_id}'][f'attention_{layer_id}_{head_id}'] = attn
                 elif rep_type=='q_and_k':
                     assert args.intervention_type=='swap'
-                    assert len(pos_types)==2
-                    k_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[0]}']
-                    q_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[1]}']
-                    if args.test:
-                        k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[0],'key',
-                                    outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
-                                    token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
-                        q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[1],'query',
-                                    outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
-                                    token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
-                    else:
-                        k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[0],'key',
-                                    outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
-                                    token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
-                        q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[1],'query',
-                                    outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
-                                    token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
-                    if pos_types[0]!='context' or not args.no_eq_len_condition:
-                        assert len(k_pos)==len(k_vec)
-                    if pos_types[1]!='context' or not args.no_eq_len_condition:
-                        assert len(q_pos)==len(q_vec)
-                    if f'key_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
-                        interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'] = []
-                    interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'].extend([(k_pos,k_vec)])
-                    if f'query_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
-                        interventions[context_id][f'masked_sent_{masked_sent_id}'][f'query_{layer_id}'] = []
-                    interventions[context_id][f'masked_sent_{masked_sent_id}'][f'query_{layer_id}'].extend([(q_pos,q_vec)])
+
+                    assert len(pos_types)%2==0
+                    for pos_pair_id in range(len(pos_types)//2):
+                        k_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[2*pos_pair_id]}']
+                        q_pos = token_ids[context_id][f'masked_sent_{masked_sent_id}'][f'{pos_types[2*pos_pair_id+1]}']
+                        if args.test:
+                            k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[2*pos_pair_id],'key',
+                                        outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
+                                        token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
+                            q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[2*pos_pair_id+1],'query',
+                                        outputs[f'masked_sent_{masked_sent_id}_context_{context_id+1}'],
+                                        token_ids[context_id][f'masked_sent_{masked_sent_id}'],args)
+                        else:
+                            k_vec = GetReps(model,context_id,layer_id,head_id,pos_types[2*pos_pair_id],'key',
+                                        outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
+                                        token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
+                            q_vec = GetReps(model,context_id,layer_id,head_id,pos_types[2*pos_pair_id+1],'query',
+                                        outputs[f'masked_sent_{masked_sent_id}_context_{2-context_id}'],
+                                        token_ids[1-context_id][f'masked_sent_{masked_sent_id}'],args)
+                        if pos_types[2*pos_pair_id]!='context' or not args.no_eq_len_condition:
+                            assert len(k_pos)==len(k_vec)
+                        if pos_types[2*pos_pair_id+1]!='context' or not args.no_eq_len_condition:
+                            assert len(q_pos)==len(q_vec)
+                        if f'key_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
+                            interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'] = []
+                        interventions[context_id][f'masked_sent_{masked_sent_id}'][f'key_{layer_id}'].extend([(k_pos,k_vec)])
+                        if f'query_{layer_id}' not in interventions[context_id][f'masked_sent_{masked_sent_id}']:
+                            interventions[context_id][f'masked_sent_{masked_sent_id}'][f'query_{layer_id}'] = []
+                        interventions[context_id][f'masked_sent_{masked_sent_id}'][f'query_{layer_id}'].extend([(q_pos,q_vec)])
                 else:
                     assert args.intervention_type=='swap'
                     for pos_type in pos_types:
