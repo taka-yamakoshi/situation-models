@@ -118,7 +118,7 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
             ffn_output = apply_chunking_to_forward(layer.ff_chunk,layer.chunk_size_feed_forward,
                                                     layer.seq_len_dim,hidden_post_attn)
             new_hidden = layer.full_layer_layer_norm(ffn_output+hidden_post_attn)
-        return new_hidden
+        return (new_hidden, attn_mat)
 
 def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
     if args.model.startswith('bert'):
@@ -138,13 +138,20 @@ def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
         lm_head = model.predictions
     else:
         raise NotImplementedError("invalid model name")
+    output_hidden = []
+    output_attn_mat = []
     hidden = start_hidden.clone()
+    output_hidden.append(hidden)
     with torch.no_grad():
         if args.model.startswith('albert'):
             for layer_id in range(start_layer_id, model.config.num_hidden_layers):
-                hidden = layer_intervention(layer_id,model.albert.encoder.albert_layer_groups[0].albert_layers[0],interventions,hidden,args)
+                (hidden, attn_mat) = layer_intervention(layer_id,model.albert.encoder.albert_layer_groups[0].albert_layers[0],interventions,hidden,args)
+                output_hidden.append(hidden)
+                output_attn_mat.append(attn_mat)
         else:
             for layer_id in range(start_layer_id, model.config.num_hidden_layers):
-                hidden = layer_intervention(layer_id,core_model.encoder.layer[layer_id],interventions,hidden,args)
+                (hidden, attn_mat) = layer_intervention(layer_id,core_model.encoder.layer[layer_id],interventions,hidden,args)
+                output_hidden.append(hidden)
+                output_attn_mat.append(attn_mat)
         logits = lm_head(hidden)
-    return logits
+    return (logits,output_hidden,output_attn_mat)

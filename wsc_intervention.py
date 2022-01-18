@@ -87,13 +87,13 @@ def CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types
 
 
 def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args):
-    int_logits_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],
+    int_outputs_1_context_1 = skeleton_model(layer_id,outputs['masked_sent_1_context_1'][1][layer_id],
                                             model,interventions[0]['masked_sent_1'],args)
-    int_logits_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],
+    int_outputs_2_context_1 = skeleton_model(layer_id,outputs['masked_sent_2_context_1'][1][layer_id],
                                             model,interventions[0]['masked_sent_2'],args)
-    int_logits_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],
+    int_outputs_1_context_2 = skeleton_model(layer_id,outputs['masked_sent_1_context_2'][1][layer_id],
                                             model,interventions[1]['masked_sent_1'],args)
-    int_logits_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],
+    int_outputs_2_context_2 = skeleton_model(layer_id,outputs['masked_sent_2_context_2'][1][layer_id],
                                             model,interventions[1]['masked_sent_2'],args)
 
     if 'context' in pos_types and not args.test:
@@ -106,9 +106,9 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
     option_tokens_list_1 = option_tokens_lists[0]
     option_tokens_list_2 = option_tokens_lists[1]
 
-    choice_probs_sum_1,choice_probs_ave_1 = EvaluatePredictions(int_logits_1_context_1,int_logits_2_context_1,
+    choice_probs_sum_1,choice_probs_ave_1 = EvaluatePredictions(int_outputs_1_context_1[0],int_outputs_2_context_1[0],
                                                                 token_ids_new_1,option_tokens_list_1,args)
-    choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_logits_1_context_2,int_logits_2_context_2,
+    choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_outputs_1_context_2[0],int_outputs_2_context_2[0],
                                                                 token_ids_new_2,option_tokens_list_2,args)
 
     results = {}
