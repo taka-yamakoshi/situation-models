@@ -112,10 +112,14 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
     choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_outputs_1_context_2[0],int_outputs_2_context_2[0],
                                                                 token_ids_new_2,option_tokens_list_2,args)
 
-    attn_1_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_1[2]),token_ids_new_1['masked_sent_1'],prediction_task=True)
-    attn_2_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_1[2]),token_ids_new_1['masked_sent_2'],prediction_task=True)
-    attn_1_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_2[2]),token_ids_new_2['masked_sent_1'],prediction_task=True)
-    attn_2_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_2[2]),token_ids_new_2['masked_sent_2'],prediction_task=True)
+    attn_1_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_1[2]),
+                                        token_ids_new_1['masked_sent_1'],prediction_task=True,last_only=True)
+    attn_2_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_1[2]),
+                                        token_ids_new_1['masked_sent_2'],prediction_task=True,last_only=True)
+    attn_1_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_2[2]),
+                                        token_ids_new_2['masked_sent_1'],prediction_task=True,last_only=True)
+    attn_2_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_2[2]),
+                                        token_ids_new_2['masked_sent_2'],prediction_task=True,last_only=True)
 
     results = {}
     results['sum_1'] = choice_probs_sum_1
