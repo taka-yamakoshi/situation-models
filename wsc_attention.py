@@ -46,27 +46,30 @@ def calc_attn_norm(model,hidden,attention,args):
             attn_norm[layer_id,head_id] = torch.linalg.norm(alpha_value,dim=-1).to('cpu').detach().numpy()
     return attn_norm
 
-def EvaluateAttention(attention,token_ids):
+def EvaluateAttention(attention,token_ids,prediction_task=False):
     attn_dict = {}
-    pron_token_id = token_ids['pron_id'].to('cpu')
-    for feature in ['option_1','option_2','context','period','cls','sep','other']:
-        attn = attention[:,:,pron_token_id,token_ids[feature].to('cpu')]
-        if len(token_ids[feature].to('cpu'))>1:
-            attn = attn.sum(axis=-1)
-        assert len(attn.shape)==2
-        attn_dict[f'pron_{feature}'] = attn
-    for option in ['option_1','option_2']:
-        for feature in ['pron_id','context','period','cls','sep','other']:
-            attn = attention[:,:,:,token_ids[feature].to('cpu')]
-            if len(token_ids[feature].to('cpu'))>1:
-                attn = attn.sum(axis=-1)
-            assert len(attn.shape)==3
-            attn = attn[:,:,token_ids[option].to('cpu')]
-            if len(token_ids[option].to('cpu'))>1:
-                attn = attn.mean(axis=-1)
-            assert len(attn.shape)==2
-            attn_dict[f'{option}_{feature}'] = attn
+    if prediction_task:
+        out_pos = 'masks'
+    else:
+        out_pos = 'pron_id'
+    for in_pos in ['option_1','option_2','context','period','cls','sep','other']:
+        attn_dict[f'{out_pos}_{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids)
+    for out_pos in ['option_1','option_2']:
+        for in_pos in ['masks','context','period','cls','sep','other']:
+            attn_dict[f'{out_pos}_{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids)
     return attn_dict
+
+def ExtractAttention(attn,in_pos,out_pos,token_ids):
+    assert len(attn.shape)==4 and attn.shape[2]==attn.shape[3]
+    attn = attn[:,:,:,token_ids[in_pos].to('cpu')]
+    if len(token_ids[in_pos])>1:
+        attn = attn.sum(axis=-1)
+    assert len(attn.shape)==3
+    attn = attn[:,:,token_ids[out_pos].to('cpu')]
+    if len(token_ids[out_pos])>1:
+        attn = attn.mean(axis=-1)
+    assert len(attn.shape)==2
+    return attn
 
 def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
     output, token_ids, option_tokens_list, masked_sent = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context, output_for_attn=True)

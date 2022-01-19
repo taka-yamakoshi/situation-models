@@ -7,6 +7,7 @@ import json
 import csv
 from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel, GetReps
 from model_skeleton import skeleton_model, ExtractAttnLayer
+from wsc_attention import EvaluateAttention,convert_to_numpy
 import pandas as pd
 import time
 import math
@@ -111,11 +112,20 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
     choice_probs_sum_2,choice_probs_ave_2 = EvaluatePredictions(int_outputs_1_context_2[0],int_outputs_2_context_2[0],
                                                                 token_ids_new_2,option_tokens_list_2,args)
 
+    attn_1_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_1[2]),token_ids_new_1['masked_sent_1'],prediction_task=True)
+    attn_2_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_1[2]),token_ids_new_1['masked_sent_2'],prediction_task=True)
+    attn_1_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_2[2]),token_ids_new_2['masked_sent_1'],prediction_task=True)
+    attn_2_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_2[2]),token_ids_new_2['masked_sent_2'],prediction_task=True)
+
     results = {}
     results['sum_1'] = choice_probs_sum_1
     results['sum_2'] = choice_probs_sum_2
     results['ave_1'] = choice_probs_ave_1
     results['ave_2'] = choice_probs_ave_2
+    results['attn_1_context_1'] = attn_1_context_1
+    results['attn_2_context_1'] = attn_2_context_1
+    results['attn_1_context_2'] = attn_1_context_2
+    results['attn_2_context_2'] = attn_2_context_2
     return results
 
 def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,args):
