@@ -1,3 +1,4 @@
+# export DATA_PATH='YOUR PATH TO DATA FILES'
 import numpy as np
 import torch
 import pickle
@@ -11,6 +12,7 @@ from wsc_attention import EvaluateAttention,convert_to_numpy
 import pandas as pd
 import time
 import math
+import os
 
 def CreateInterventions(model,interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
     if len(interventions)==0:
@@ -126,10 +128,10 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
     results['sum_2'] = choice_probs_sum_2
     results['ave_1'] = choice_probs_ave_1
     results['ave_2'] = choice_probs_ave_2
-    results['attn_1_context_1'] = attn_1_context_1
-    results['attn_2_context_1'] = attn_2_context_1
-    results['attn_1_context_2'] = attn_1_context_2
-    results['attn_2_context_2'] = attn_2_context_2
+    results['diff_1_context_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
+    results['diff_2_context_1'] = attn_2_context_1['masks-option_1']-attn_2_context_1['masks-option_2']
+    results['diff_1_context_2'] = attn_1_context_2['masks-option_1']-attn_1_context_2['masks-option_2']
+    results['diff_2_context_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
     return results
 
 def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,args):
@@ -152,11 +154,24 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
         out_dict = {}
         choice_probs_sum_1, choice_probs_ave_1 = EvaluatePredictions(outputs_1[0][0],outputs_1[1][0],token_ids_1,option_tokens_list_1,args)
         choice_probs_sum_2, choice_probs_ave_2 = EvaluatePredictions(outputs_2[0][0],outputs_2[1][0],token_ids_2,option_tokens_list_2,args)
+
+        attn_1_context_1 = EvaluateAttention(convert_to_numpy(outputs_1[0][2]),
+                                            token_ids_1['masked_sent_1'],prediction_task=True,last_only=True)
+        attn_2_context_1 = EvaluateAttention(convert_to_numpy(outputs_1[1][2]),
+                                            token_ids_1['masked_sent_2'],prediction_task=True,last_only=True)
+        attn_1_context_2 = EvaluateAttention(convert_to_numpy(outputs_2[0][2]),
+                                            token_ids_2['masked_sent_1'],prediction_task=True,last_only=True)
+        attn_2_context_2 = EvaluateAttention(convert_to_numpy(outputs_2[1][2]),
+                                            token_ids_2['masked_sent_2'],prediction_task=True,last_only=True)
         out_dict['original'] = {}
         out_dict['original']['sum_1'] = choice_probs_sum_1
         out_dict['original']['sum_2'] = choice_probs_sum_2
         out_dict['original']['ave_1'] = choice_probs_ave_1
         out_dict['original']['ave_2'] = choice_probs_ave_2
+        out_dict['original']['diff_1_context_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
+        out_dict['original']['diff_2_context_1'] = attn_2_context_1['masks-option_1']-attn_2_context_1['masks-option_2']
+        out_dict['original']['diff_1_context_2'] = attn_1_context_2['masks-option_1']-attn_1_context_2['masks-option_2']
+        out_dict['original']['diff_2_context_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
 
         for layer_id in range(model.config.num_hidden_layers):
             if str(layer_id) in args.layer.split('-') or args.layer=='all':
@@ -285,37 +300,54 @@ if __name__=='__main__':
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
 
-    out_dict = {}
-    for line in text[:500]:
-        if args.pos_type is None:
-            results = ApplyInterventions(head,line,[],args.rep_type.split('-'),model,tokenizer,mask_id,args)
-        else:
-            results = ApplyInterventions(head,line,args.pos_type.split('-'),args.rep_type.split('-'),model,tokenizer,mask_id,args)
-        if type(results) is str:
-            continue
-        else:
-            out_dict[line[head.index('pair_id')]] = results
-
     if args.pos_type is None:
         if args.dataset=='superglue':
-            out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}_{args.stimuli}'\
-                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("DATA_PATH")}/winogrande_{args.size}_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}'\
-                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
     else:
         if args.dataset=='superglue':
-            out_file_name = f'datafile/superglue_wsc_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}'\
-                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'datafile/winogrande_{args.size}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("DATA_PATH")}/winogrande_{args.size}_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
-                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}.pkl'
-    with open(out_file_name,'wb') as f:
-        pickle.dump(out_dict,f)
+                            +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
+
+    #out_dict = {}
+    with open(f'{out_file_name}.csv','w') as f:
+        writer = csv.writer(f)
+        writer.writerow(head+['interv_type','value_type','head_id','value'])
+        sent_num = 0
+        for line in text[:500]:
+            if args.pos_type is None:
+                results = ApplyInterventions(head,line,[],args.rep_type.split('-'),model,tokenizer,mask_id,args)
+            else:
+                results = ApplyInterventions(head,line,args.pos_type.split('-'),args.rep_type.split('-'),model,tokenizer,mask_id,args)
+            if type(results) is str:
+                continue
+            else:
+                sent_num += 1
+                #out_dict[line[head.index('pair_id')]] = results
+                for key,value in results.items():
+                    for context_id in [1,2]:
+                        writer.writerow(line+[key,f'sum_{context_id}',0,
+                                        value[f'sum_{context_id}'][0]-value[f'sum_{context_id}'][1]])
+                        writer.writerow(line+[key,f'ave_{context_id}',0,
+                                        value[f'ave_{context_id}'][0]-value[f'ave_{context_id}'][1]])
+                        for masked_sent_id in [1,2]:
+                            assert len(value[f'diff_{masked_sent_id}_context_{context_id}'])==model.config.num_attention_heads
+                            for head_id in range(model.config.num_attention_heads):
+                                writer.writerow(line+[key,f'diff_{masked_sent_id}_context_{context_id}',head_id,
+                                                value[f'diff_{masked_sent_id}_context_{context_id}'][head_id]])
+
+    #with open(f'{out_file_name}.pkl','wb') as f:
+    #    pickle.dump(out_dict,f)
 
     print(f'Time it took: {time.time()-start}')
-    print(f'# sentences processed: {len(list(out_dict.keys()))}\n')
+    print(f'# sentences processed: {sent_num}\n')
