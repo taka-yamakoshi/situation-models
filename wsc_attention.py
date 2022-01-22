@@ -52,9 +52,9 @@ def EvaluateAttention(attention,token_ids,prediction_task=False,last_only=False)
         out_pos = 'masks'
     else:
         out_pos = 'pron_id'
-    for in_pos in ['option_1','option_2','context','period','cls','sep','other']:
+    for in_pos in ['option_1','option_2','options','context','period','cls','sep','other']:
         attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,last_only)
-    for out_pos in ['option_1','option_2']:
+    for out_pos in ['option_1','option_2','options']:
         for in_pos in ['masks','context','period','cls','sep','other']:
             attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,last_only)
     return attn_dict
