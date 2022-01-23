@@ -116,10 +116,10 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
 
     attn_1_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_1[2]),
                                         token_ids_new_1['masked_sent_1'],prediction_task=True,last_only=True)
-    attn_2_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_1[2]),
-                                        token_ids_new_1['masked_sent_2'],prediction_task=True,last_only=True)
-    attn_1_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_2[2]),
-                                        token_ids_new_2['masked_sent_1'],prediction_task=True,last_only=True)
+    #attn_2_context_1 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_1[2]),
+    #                                    token_ids_new_1['masked_sent_2'],prediction_task=True,last_only=True)
+    #attn_1_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_1_context_2[2]),
+    #                                    token_ids_new_2['masked_sent_1'],prediction_task=True,last_only=True)
     attn_2_context_2 = EvaluateAttention(convert_to_numpy(int_outputs_2_context_2[2]),
                                         token_ids_new_2['masked_sent_2'],prediction_task=True,last_only=True)
 
@@ -128,10 +128,10 @@ def ApplyInterventionsLayer(interventions,model,layer_id,pos_types,rep_types,out
     results['sum_2'] = choice_probs_sum_2
     results['ave_1'] = choice_probs_ave_1
     results['ave_2'] = choice_probs_ave_2
-    results['diff_1_context_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
-    results['diff_2_context_1'] = attn_2_context_1['masks-option_1']-attn_2_context_1['masks-option_2']
-    results['diff_1_context_2'] = attn_1_context_2['masks-option_1']-attn_1_context_2['masks-option_2']
-    results['diff_2_context_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
+    results['masks-option-diff_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
+    results['masks-option-diff_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
+    #results['options-context_1'] = attn_1_context_1['options-context']
+    #results['options-context_2'] = attn_2_context_2['options-context']
     return results
 
 def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,args):
@@ -157,10 +157,10 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
 
         attn_1_context_1 = EvaluateAttention(convert_to_numpy(outputs_1[0][2]),
                                             token_ids_1['masked_sent_1'],prediction_task=True,last_only=True)
-        attn_2_context_1 = EvaluateAttention(convert_to_numpy(outputs_1[1][2]),
-                                            token_ids_1['masked_sent_2'],prediction_task=True,last_only=True)
-        attn_1_context_2 = EvaluateAttention(convert_to_numpy(outputs_2[0][2]),
-                                            token_ids_2['masked_sent_1'],prediction_task=True,last_only=True)
+        #attn_2_context_1 = EvaluateAttention(convert_to_numpy(outputs_1[1][2]),
+        #                                    token_ids_1['masked_sent_2'],prediction_task=True,last_only=True)
+        #attn_1_context_2 = EvaluateAttention(convert_to_numpy(outputs_2[0][2]),
+        #                                    token_ids_2['masked_sent_1'],prediction_task=True,last_only=True)
         attn_2_context_2 = EvaluateAttention(convert_to_numpy(outputs_2[1][2]),
                                             token_ids_2['masked_sent_2'],prediction_task=True,last_only=True)
         out_dict['original'] = {}
@@ -168,10 +168,10 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
         out_dict['original']['sum_2'] = choice_probs_sum_2
         out_dict['original']['ave_1'] = choice_probs_ave_1
         out_dict['original']['ave_2'] = choice_probs_ave_2
-        out_dict['original']['diff_1_context_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
-        out_dict['original']['diff_2_context_1'] = attn_2_context_1['masks-option_1']-attn_2_context_1['masks-option_2']
-        out_dict['original']['diff_1_context_2'] = attn_1_context_2['masks-option_1']-attn_1_context_2['masks-option_2']
-        out_dict['original']['diff_2_context_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
+        out_dict['original']['masks-option-diff_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
+        out_dict['original']['masks-option-diff_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
+        #out_dict['original']['options-context_1'] = attn_1_context_1['options-context']
+        #out_dict['original']['options-context_2'] = attn_2_context_2['options-context']
 
         for layer_id in range(model.config.num_hidden_layers):
             if str(layer_id) in args.layer.split('-') or args.layer=='all':
@@ -322,7 +322,9 @@ if __name__=='__main__':
     #out_dict = {}
     with open(f'{out_file_name}.csv','w') as f:
         writer = csv.writer(f)
-        writer.writerow(head+['interv_type','value_type','head_id','value'])
+        writer.writerow(head+['interv_type','original_score','score','effect_ave',
+                                *[f'masks-option-diff_{head_id}' for head_id in range(model.config.num_attention_heads)],
+                                *[f'masks-option-diff_effect_{head_id}' for head_id in range(model.config.num_attention_heads)]])
         sent_num = 0
         for line in text[:500]:
             if args.pos_type is None:
@@ -334,18 +336,29 @@ if __name__=='__main__':
             else:
                 sent_num += 1
                 #out_dict[line[head.index('pair_id')]] = results
+                original_1 = results['original']['ave_1'][0]-results['original']['ave_1'][1]
+                original_2 = results['original']['ave_2'][0]-results['original']['ave_2'][1]
+                original_attn_1 = np.array([results['original']['masks-option-diff_1'][head_id]
+                                            for head_id in range(model.config.num_attention_heads)])
+                original_attn_2 = np.array([results['original']['masks-option-diff_2'][head_id]
+                                            for head_id in range(model.config.num_attention_heads)])
+                original_score = (original_1>0)&(original_2<0)
                 for key,value in results.items():
-                    for context_id in [1,2]:
-                        writer.writerow(line+[key,f'sum_{context_id}',0,
-                                        value[f'sum_{context_id}'][0]-value[f'sum_{context_id}'][1]])
-                        writer.writerow(line+[key,f'ave_{context_id}',0,
-                                        value[f'ave_{context_id}'][0]-value[f'ave_{context_id}'][1]])
-                        for masked_sent_id in [1,2]:
-                            assert len(value[f'diff_{masked_sent_id}_context_{context_id}'])==model.config.num_attention_heads
-                            for head_id in range(model.config.num_attention_heads):
-                                writer.writerow(line+[key,f'diff_{masked_sent_id}_context_{context_id}',head_id,
-                                                value[f'diff_{masked_sent_id}_context_{context_id}'][head_id]])
+                    interv_1 = value['ave_1'][0]-value['ave_1'][1]
+                    interv_2 = value['ave_2'][0]-value['ave_2'][1]
+                    interv_attn_1 = np.array([value['masks-option-diff_1'][head_id]
+                                                for head_id in range(model.config.num_attention_heads)])
+                    interv_attn_2 = np.array([value['masks-option-diff_2'][head_id]
+                                                for head_id in range(model.config.num_attention_heads)])
 
+                    score = (interv_1>0)&(interv_2<0)
+                    effect_1 = original_1-interv_1
+                    effect_2 = interv_2-original_2
+                    effect_attn_1 = original_attn_1-interv_attn_1
+                    effect_attn_2 = interv_attn_2-original_attn_2
+                    writer.writerow(line+[key,original_score,score,(effect_1+effect_2)/2,
+                                            *list((interv_attn_1-interv_attn_2)/2),
+                                            *list((effect_attn_1+effect_attn_2)/2)])
     #with open(f'{out_file_name}.pkl','wb') as f:
     #    pickle.dump(out_dict,f)
 
