@@ -3,14 +3,16 @@ import torch
 import torch.nn.functional as F
 import math
 
-def swap_vecs(hidden,pos,vec,args):
-    if len(pos)==len(vec):
-        new_hidden = hidden.clone()
-        new_hidden[:,pos,:] = vec.clone()
-    else:
-        new_hidden = torch.cat([hidden[0][:pos[0]].clone(),
-                                vec.clone(),
-                                hidden[0][(pos[-1]+1):].clone()]).unsqueeze(0).to(args.device)
+def swap_vecs(hidden,pos,head_id,vec,head_dim,args):
+    assert len(pos) == len(vec), 'no_eq_len_condition option is now deprecated'
+    assert len(hidden.shape)==3
+    #if len(pos)==len(vec):
+    new_hidden = hidden.clone()
+    new_hidden[:,:,head_dim*head_id:head_dim*(head_id+1)][:,pos,:] = vec.clone()
+    #else:
+    #    new_hidden = torch.cat([hidden[0][:pos[0]].clone(),
+    #                            vec.clone(),
+    #                            hidden[0][(pos[-1]+1):].clone()]).unsqueeze(0).to(args.device)
     return new_hidden
 
 def args_setup_deberta(args,init_shape):
@@ -54,36 +56,36 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
             attention_layer = layer.attention
         num_heads = attention_layer.num_attention_heads
         head_dim = attention_layer.attention_head_size
-        # if the intervention is layer only, apply the intervention first
-        if args.no_eq_len_condition\
-         and f'layer_{layer_id}' in interventions and f'key_{layer_id}' not in interventions\
-         and f'query_{layer_id}' not in interventions and f'value_{layer_id}' not in interventions:
-            for (pos,vec) in interventions[f'layer_{layer_id}']:
-                hidden = swap_vecs(hidden,pos,vec,args)
-            key = attention_layer.key(hidden)
-            query = attention_layer.query(hidden)
-            value = attention_layer.value(hidden)
-        # otherwise, calculate key, query, and value for attention first
-        else:
-            key = attention_layer.key(hidden)
-            query = attention_layer.query(hidden)
-            value = attention_layer.value(hidden)
 
-            # swap representations
-            if f'layer_{layer_id}' in interventions:
-                for (pos,vec) in interventions[f'layer_{layer_id}']:
-                    hidden = swap_vecs(hidden,pos,vec,args)
-            #NOTE: this swaps representations for all heads:
-            #when doing intervenstions on each head, engineer the intervenstions accordingly
-            if f'key_{layer_id}' in interventions:
-                for (pos,vec) in interventions[f'key_{layer_id}']:
-                    key = swap_vecs(key,pos,vec,args)
-            if f'query_{layer_id}' in interventions:
-                for (pos,vec) in interventions[f'query_{layer_id}']:
-                    query = swap_vecs(query,pos,vec,args)
-            if f'value_{layer_id}' in interventions:
-                for (pos,vec) in interventions[f'value_{layer_id}']:
-                    value = swap_vecs(value,pos,vec,args)
+        # if the intervention is layer only, apply the intervention first
+        #if args.no_eq_len_condition\
+        # and f'layer_{layer_id}_{head_id}' in interventions and f'key_{layer_id}_{head_id}' not in interventions\
+        # and f'query_{layer_id}_{head_id}' not in interventions and f'value_{layer_id}_{head_id}' not in interventions:
+        #    for (pos,vec) in interventions[f'layer_{layer_id}_{head_id}']:
+        #        hidden = swap_vecs(hidden,pos,vec,args)
+        #    key = attention_layer.key(hidden)
+        #    query = attention_layer.query(hidden)
+        #    value = attention_layer.value(hidden)
+        # otherwise, calculate key, query, and value for attention first
+        #else:
+        key = attention_layer.key(hidden)
+        query = attention_layer.query(hidden)
+        value = attention_layer.value(hidden)
+
+        # swap representations
+        for head_id in range(num_heads):
+            if f'layer_{layer_id}_{head_id}' in interventions:
+                for (pos,vec) in interventions[f'layer_{layer_id}_{head_id}']:
+                    hidden = swap_vecs(hidden,pos,head_id,vec,head_dim,args)
+            if f'key_{layer_id}_{head_id}' in interventions:
+                for (pos,vec) in interventions[f'key_{layer_id}_{head_id}']:
+                    key = swap_vecs(key,pos,head_id,vec,head_dim,args)
+            if f'query_{layer_id}_{head_id}' in interventions:
+                for (pos,vec) in interventions[f'query_{layer_id}_{head_id}']:
+                    query = swap_vecs(query,pos,head_id,vec,head_dim,args)
+            if f'value_{layer_id}_{head_id}' in interventions:
+                for (pos,vec) in interventions[f'value_{layer_id}_{head_id}']:
+                    value = swap_vecs(value,pos,head_id,vec,head_dim,args)
 
         #split into multiple heads
         split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
@@ -99,9 +101,10 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
 
         z_rep_indiv = attn_mat@split_value
         z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*hidden.size())
-        if f'z_rep_{layer_id}' in interventions:
-            for (pos,vec) in interventions[f'z_rep_{layer_id}']:
-                z_rep = swap_vecs(z_rep,pos,vec,args)
+        for head_id in range(num_heads):
+            if f'z_rep_{layer_id}_{head_id}' in interventions:
+                for (pos,vec) in interventions[f'z_rep_{layer_id}_{head_id}']:
+                    z_rep = swap_vecs(z_rep,pos,head_id,vec,head_dim,args)
 
         if args.model.startswith('bert') or args.model.startswith('roberta'):
             hidden_post_attn_res = layer.attention.output.dense(z_rep)+hidden # residual connection
