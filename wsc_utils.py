@@ -236,10 +236,14 @@ def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
         probs_1 = F.log_softmax(logits_1[:,:-1], dim = -1).to('cpu')
         probs_2 = F.log_softmax(logits_2[:,:-1], dim = -1).to('cpu')
     assert probs_1.shape[1]==len(tokens_list[0]) and probs_2.shape[1]==len(tokens_list[1])
-    choice_probs_sum = [np.sum([probs_1[0,token_id,token].item() for token_id,token in enumerate(tokens_list[0])]),
-                        np.sum([probs_2[0,token_id,token].item() for token_id,token in enumerate(tokens_list[1])])]
-    choice_probs_ave = [np.mean([probs_1[0,token_id,token].item() for token_id,token in enumerate(tokens_list[0])]),
-                        np.mean([probs_2[0,token_id,token].item() for token_id,token in enumerate(tokens_list[1])])]
+    choice_probs_sum = [np.sum([probs_1[:,token_id,token].detach().numpy()
+                                for token_id,token in enumerate(tokens_list[0])],axis=0).squeeze(),
+                        np.sum([probs_2[:,token_id,token].detach().numpy()
+                                for token_id,token in enumerate(tokens_list[1])],axis=0).squeeze()]
+    choice_probs_ave = [np.mean([probs_1[:,token_id,token].detach().numpy()
+                                for token_id,token in enumerate(tokens_list[0])],axis=0).squeeze(),
+                        np.mean([probs_2[:,token_id,token].detach().numpy()
+                                for token_id,token in enumerate(tokens_list[1])],axis=0).squeeze()]
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
 def GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):

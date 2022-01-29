@@ -9,7 +9,7 @@ import csv
 from wsc_utils import CalcOutputs, LoadDataset, LoadModel
 
 def convert_to_numpy(attn):
-    return np.array([layer.to('cpu').squeeze().detach().numpy() for layer in attn])
+    return np.array([layer.to('cpu').detach().numpy() for layer in attn])
 
 def calc_attention_rollout(attn):
     full_attn = 0.5*attn+0.5*np.eye(attn.shape[-1])[None,None,...]
@@ -60,19 +60,20 @@ def EvaluateAttention(attention,token_ids,prediction_task=False,last_only=False)
     return attn_dict
 
 def ExtractAttention(attn,in_pos,out_pos,token_ids,last_only=False):
-    assert len(attn.shape)==4 and attn.shape[2]==attn.shape[3]
-    attn = attn[:,:,:,token_ids[in_pos].to('cpu')]
+    #attn.shape=(num_layers,batch_size,num_heads,seq_len,seq_len)
+    assert len(attn.shape)==5 and attn.shape[3]==attn.shape[4]
+    attn = attn[:,:,:,:,token_ids[in_pos].to('cpu')]
     if len(token_ids[in_pos])>1:
         attn = attn.sum(axis=-1)
-    assert len(attn.shape)==3
-    attn = attn[:,:,token_ids[out_pos].to('cpu')]
+    assert len(attn.shape)==4
+    attn = attn[:,:,:,token_ids[out_pos].to('cpu')]
     if len(token_ids[out_pos])>1:
         attn = attn.mean(axis=-1)
-    assert len(attn.shape)==2
+    assert len(attn.shape)==3
     if last_only:
-        return attn[-1,:]
+        return attn[-1,:,:].squeeze()
     else:
-        return attn
+        return attn.squeeze()
 
 def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
     output, token_ids, option_tokens_list, masked_sent = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context, output_for_attn=True)
