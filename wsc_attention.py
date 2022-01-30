@@ -46,20 +46,20 @@ def calc_attn_norm(model,hidden,attention,args):
             attn_norm[layer_id,head_id] = torch.linalg.norm(alpha_value,dim=-1).to('cpu').detach().numpy()
     return attn_norm
 
-def EvaluateAttention(attention,token_ids,prediction_task=False,last_only=False):
+def EvaluateAttention(attention,token_ids,prediction_task=False,target_layer_id=None):
     attn_dict = {}
     if prediction_task:
         out_pos = 'masks'
     else:
         out_pos = 'pron_id'
     for in_pos in ['option_1','option_2','options','context','period','cls','sep','other']:
-        attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,last_only)
+        attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,target_layer_id)
     for out_pos in ['option_1','option_2','options']:
         for in_pos in ['masks','context','period','cls','sep','other']:
-            attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,last_only)
+            attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,target_layer_id)
     return attn_dict
 
-def ExtractAttention(attn,in_pos,out_pos,token_ids,last_only=False):
+def ExtractAttention(attn,in_pos,out_pos,token_ids,target_layer_id):
     #attn.shape=(num_layers,batch_size,num_heads,seq_len,seq_len)
     assert len(attn.shape)==5 and attn.shape[3]==attn.shape[4]
     attn = attn[:,:,:,:,token_ids[in_pos].to('cpu')]
@@ -70,8 +70,8 @@ def ExtractAttention(attn,in_pos,out_pos,token_ids,last_only=False):
     if len(token_ids[out_pos])>1:
         attn = attn.mean(axis=-1)
     assert len(attn.shape)==3
-    if last_only:
-        return attn[-1,:,:].squeeze()
+    if target_layer_id is not None:
+        return attn[target_layer_id,:,:].squeeze()
     else:
         return attn.squeeze()
 
