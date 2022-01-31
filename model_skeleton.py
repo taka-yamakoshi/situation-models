@@ -62,7 +62,11 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
     for head_id in range(num_heads):
         if f'attention_{layer_id}_{head_id}' in interventions:
             assert len(attn_mat.shape)==4
-            attn_mat[:,head_id,:,:] = interventions[f'attention_{layer_id}_{head_id}'].clone()
+            if args.multihead:
+                attn_mat[:,head_id,:,:] = interventions[f'attention_{layer_id}_{head_id}'].clone()
+            else:
+                assert attn_mat.shape[0]==num_heads
+                attn_mat[head_id,head_id,:,:] = interventions[f'attention_{layer_id}_{head_id}'].clone()
 
     z_rep_indiv = attn_mat@split_val
     z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*hidden.size())
