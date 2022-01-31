@@ -33,8 +33,8 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
     num_heads = attention_layer.num_attention_heads
     head_dim = attention_layer.attention_head_size
 
-    key = attention_layer.key(hidden)
     qry = attention_layer.query(hidden)
+    key = attention_layer.key(hidden)
     val = attention_layer.value(hidden)
 
     # swap representations
@@ -52,8 +52,8 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
                         val = swap_vecs(val,pos,head_id,vec,head_dim,args)
 
     #split into multiple heads
-    split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
     split_qry = qry.view(*(qry.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
+    split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
     split_val = val.view(*(val.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
 
     #calculate the attention matrix
@@ -86,7 +86,7 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
         ffn_output = apply_chunking_to_forward(layer.ff_chunk,layer.chunk_size_feed_forward,
                                                 layer.seq_len_dim,hidden_post_attn)
         new_hidden = layer.full_layer_layer_norm(ffn_output+hidden_post_attn)
-    return (new_hidden, attn_mat)
+    return (new_hidden, attn_mat, [split_qry,split_key,split_val], z_rep)
 
 def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
     if args.model.startswith('bert'):
@@ -102,6 +102,10 @@ def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
         raise NotImplementedError("invalid model name")
     output_hidden = []
     output_attn_mat = []
+    output_qry = []
+    output_key = []
+    output_val = []
+    output_z_rep = []
     hidden = start_hidden.clone()
     output_hidden.append(hidden)
     with torch.no_grad():
@@ -110,8 +114,12 @@ def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
                 layer = model.albert.encoder.albert_layer_groups[0].albert_layers[0]
             else:
                 layer = core_model.encoder.layer[layer_id]
-            (hidden, attn_mat) = layer_intervention(layer_id,layer,interventions,hidden,args)
+            (hidden, attn_mat, qkv, z_rep) = layer_intervention(layer_id,layer,interventions,hidden,args)
             output_hidden.append(hidden)
             output_attn_mat.append(attn_mat)
+            output_qry.append(qkv[0])
+            output_key.append(qkv[1])
+            output_val.append(qkv[2])
+            output_z_rep.append(z_rep)
         logits = lm_head(hidden)
-    return (logits,output_hidden,output_attn_mat)
+    return (logits,output_hidden,output_attn_mat,[output_qry,output_key,output_val],output_z_rep)
