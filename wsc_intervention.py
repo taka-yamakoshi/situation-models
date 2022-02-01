@@ -29,7 +29,7 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
                                         layer_id,head_id,'',rep_type,args,context_id=context_id)
                     else:
                         attn = GetReps(outputs[pair_condition_id],token_ids[pair_condition_id],
-                                        layer_id,head_id,'',rep_type,args,context_id=context_id)
+                                        layer_id,head_id,'',rep_type,args)
                     assert f'attention_{layer_id}_{head_id}' not in interventions[condition_id]
                     interventions[condition_id][f'attention_{layer_id}_{head_id}'] = attn
                 elif rep_type=='q_and_k':
@@ -90,7 +90,7 @@ def ApplyInterventionsLayer(interventions,model,pos_types,rep_types,outputs,toke
             int_outputs[condition_id] = skeleton_model(0,outputs[condition_id][1][0].expand(model.config.num_attention_heads,-1,-1),
                                                         model,interventions[condition_id],args)
             pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
-            for feature in ['option_1','option_2','context','masks','other','period','cls','sep']:
+            for feature in ['options','option_1','option_2','context','masks','other','period','cls','sep']:
                 assert torch.all(token_ids[condition_id][feature]==token_ids[pair_condition_id][feature])
 
     return OutputResults(int_outputs,token_ids,option_tokens_lists,args)
@@ -261,7 +261,9 @@ if __name__=='__main__':
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-dist_{head_id}' for head_id in range(args.num_heads)],
-                                *[f'options-key-dist_{head_id}' for head_id in range(args.num_heads)]])
+                                *[f'masks-qry-cos_{head_id}' for head_id in range(args.num_heads)],
+                                *[f'options-key-dist_{head_id}' for head_id in range(args.num_heads)],
+                                *[f'options-key-cos_{head_id}' for head_id in range(args.num_heads)]])
         sent_num = 0
         for line in text[:500]:
             if args.pos_type is None:
@@ -280,8 +282,8 @@ if __name__=='__main__':
                                             for target_head_id in range(args.num_heads)])
                 original_score = (original_1>0)&(original_2<0)
 
-                original_qry_dist = EvaluateQKV('qry',results['original'],results['original'],'original','original')
-                original_key_dist = EvaluateQKV('key',results['original'],results['original'],'original','original')
+                original_qry_dist,original_qry_cos = EvaluateQKV('qry',results['original'],results['original'],'original','original')
+                original_key_dist,original_key_cos = EvaluateQKV('key',results['original'],results['original'],'original','original')
                 for layer_id in range(args.num_layers):
                     result_dict = results[f'layer_{layer_id}']
                     for head_id in range(args.num_heads):
@@ -298,19 +300,21 @@ if __name__=='__main__':
                         effect_attn_1 = original_attn_1-interv_attn_1
                         effect_attn_2 = interv_attn_2-original_attn_2
 
-                        interv_qry_dist = EvaluateQKV('qry',result_dict,results['original'],head_id,'original')
-                        interv_key_dist = EvaluateQKV('key',result_dict,results['original'],head_id,'original')
-                        assert len(interv_qry_dist)==args.num_heads
-                        assert len(interv_key_dist)==args.num_heads
+                        interv_qry_dist,interv_qry_cos = EvaluateQKV('qry',result_dict,results['original'],head_id,'original')
+                        interv_key_dist,interv_key_cos = EvaluateQKV('key',result_dict,results['original'],head_id,'original')
+                        assert len(interv_qry_dist)==args.num_heads and len(interv_qry_cos)==args.num_heads
+                        assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
                         writer.writerow(line+['interv',layer_id,head_id,original_score,score,(effect_1+effect_2)/2,
                                                 *list((interv_attn_1-interv_attn_2)/2),
                                                 *list((effect_attn_1+effect_attn_2)/2),
-                                                *list(interv_qry_dist),*list(interv_key_dist)])
+                                                *list(interv_qry_dist),*list(interv_qry_cos),
+                                                *list(interv_key_dist),*list(interv_key_cos)])
                         writer.writerow(line+['original',layer_id,head_id,original_score,original_score,0.0,
                                                 *list((original_attn_1-original_attn_2)/2),
                                                 *[0.0 for _ in range(args.num_heads)],
-                                                *list(original_qry_dist),*list(original_key_dist)])
+                                                *list(original_qry_dist),*list(original_qry_cos),
+                                                *list(original_key_dist),*list(original_key_cos)])
 
     print(f'Time it took: {time.time()-start}')
     print(f'# sentences processed: {sent_num}\n')

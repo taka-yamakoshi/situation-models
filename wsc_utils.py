@@ -343,25 +343,26 @@ def ScrambleAttn(mat,token_ids,out_pos,args):
 def ExtractQKV(vecs,pos,token_ids):
     assert len(vecs.shape)==4
     vecs = vecs[:,:,token_ids[pos],:]
-    if len(token_ids[pos])>1:
-        vecs = vecs.mean(dim=-2)
-    return vecs.to('cpu').numpy().squeeze()
+    assert len(vecs.shape)==4
+    return vecs.to('cpu').numpy()
 
 def EvaluateQKV(rep_type,result_1,result_2,interv_type_1,interv_type_2):
-    effect_list = []
+    effect_list_dist = []
+    effect_list_cos = []
     for masked_sent_id in [1,2]:
         for context_id in [1,2]:
             condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
             pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
             if interv_type_1=='original':
-                vec_1 = result_1[f'{rep_type}_{condition_id}']
+                vec_1 = result_1[f'{rep_type}_{condition_id}'][0]
             else:
                 vec_1 = result_1[f'{rep_type}_{condition_id}'][interv_type_1]
             if interv_type_2=='original':
-                vec_2 = result_2[f'{rep_type}_{pair_condition_id}']
+                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][0]
             else:
                 vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][interv_type_2]
-            #effect_list.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
-            #                            np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)))
-            effect_list.append(np.linalg.norm(vec_1-vec_2,axis=-1))
-    return np.array(effect_list).mean(axis=0)
+            assert len(vec_1.shape)==3 and len(vec_2.shape)==3
+            effect_list_dist.append(np.linalg.norm(vec_1-vec_2,axis=-1).mean(axis=-1))
+            effect_list_cos.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
+                                            np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)).mean(axis=-1))
+    return np.array(effect_list_dist).mean(axis=0),np.array(effect_list_cos).mean(axis=0)
