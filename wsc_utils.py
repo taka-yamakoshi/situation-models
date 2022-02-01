@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from wsc_alignment import AlignTokens, CheckAlignment
+from model_skeleton import skeleton_model
 import csv
 import math
 
@@ -82,7 +83,7 @@ def LoadModel(args):
 
     return model, tokenizer, mask_id, args
 
-def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False):
+def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False,use_skeleton=False):
     # load data from a line in csv
     sent = line[head.index(f'sent_{sent_id}')]
     if 'gpt2' in args.model:
@@ -140,7 +141,16 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
                             for option_id in range(2)]
 
         with torch.no_grad():
-            outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
+            if not use_skeleton:
+                outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
+            else:
+                default_outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
+                outputs = [skeleton_model(0,default_output[1][0],model,{},args) for default_output in default_outputs]
+                for default_output,output in zip(default_outputs,outputs):
+                    for default_hidden,hidden in zip(default_output[1],output[1]):
+                        assert torch.all(default_hidden == hidden)
+                    for default_attn,attn in zip(default_output[2],output[2]):
+                        assert torch.all(default_attn == attn)
 
     # realign tokens
     aligned_token_ids = {}
@@ -227,9 +237,8 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,other,aligned
 
     return output_token_ids
 
-def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
+def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     if 'bert' in args.model:
-        pron_token_id = token_ids['pron_id']
         probs_1 = F.log_softmax(logits_1[:, pron_token_id:(pron_token_id+len(tokens_list[0]))], dim = -1).to('cpu')
         probs_2 = F.log_softmax(logits_2[:, pron_token_id:(pron_token_id+len(tokens_list[1]))], dim = -1).to('cpu')
     elif 'gpt2' in args.model:
@@ -246,46 +255,31 @@ def EvaluatePredictions(logits_1,logits_2,token_ids,tokens_list,args):
                                 for token_id,token in enumerate(tokens_list[1])],axis=0).squeeze()]
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
-def GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,outputs,token_ids,args):
+def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
     assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other','options']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
-    from model_skeleton import ExtractAttnLayer
-    attn_layer = ExtractAttnLayer(layer_id,model,args)
-    num_heads = attn_layer.num_attention_heads
-    head_dim = attn_layer.attention_head_size
+    num_heads = args.num_heads
+    head_dim = args.head_dim
     if rep_type=='layer':
         layer_rep = outputs[1][layer_id]
         assert len(layer_rep.shape)==3
         vec = layer_rep[:,:,head_dim*head_id:head_dim*(head_id+1)][0,token_ids[f'{pos_type}']]
         return vec
     elif rep_type in ['key','query','value','z_rep']:
-        if rep_type=='key':
-            key = attn_layer.key(outputs[1][layer_id])
-            assert len(key.shape)==3
-            vec = key[:,:,head_dim*head_id:head_dim*(head_id+1)][0,token_ids[f'{pos_type}']]
-        elif rep_type=='query':
-            query = attn_layer.query(outputs[1][layer_id])
-            assert len(query.shape)==3
-            vec = query[:,:,head_dim*head_id:head_dim*(head_id+1)][0,token_ids[f'{pos_type}']]
+        if rep_type=='query':
+            qry = outputs[3][0][layer_id]
+            assert len(qry.shape)==4
+            vec = qry[0,head_id,token_ids[f'{pos_type}']]
+        elif rep_type=='key':
+            key = outputs[3][1][layer_id]
+            assert len(key.shape)==4
+            vec = key[0,head_id,token_ids[f'{pos_type}']]
         elif rep_type=='value':
-            value = attn_layer.value(outputs[1][layer_id])
-            assert len(value.shape)==3
-            vec = value[:,:,head_dim*head_id:head_dim*(head_id+1)][0,token_ids[f'{pos_type}']]
+            val = outputs[3][2][layer_id]
+            assert len(val.shape)==4
+            vec = val[0,head_id,token_ids[f'{pos_type}']]
         elif rep_type=='z_rep':
-            if args.model.startswith('bert') or args.model.startswith('roberta'):
-                z_rep = attn_layer(outputs[1][layer_id])
-            elif args.model.startswith('albert'):
-                key = attn_layer.key(outputs[1][layer_id])
-                query = attn_layer.query(outputs[1][layer_id])
-                value = attn_layer.value(outputs[1][layer_id])
-
-                split_key = key.view(*(key.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
-                split_query = query.view(*(query.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
-                split_value = value.view(*(value.size()[:-1]+(num_heads,head_dim))).permute(0,2,1,3)
-
-                attn_mat = F.softmax(split_query@split_key.permute(0,1,3,2)/math.sqrt(head_dim),dim=-1)
-                z_rep_indiv = attn_mat@split_value
-                z_rep = z_rep_indiv.permute(0,2,1,3).reshape(*outputs[1][layer_id].size())
+            z_rep = outputs[4][layer_id]
             assert len(z_rep.shape)==3
             vec = z_rep[:,:,head_dim*head_id:head_dim*(head_id+1)][0,token_ids[f'{pos_type}']]
         return vec
@@ -295,8 +289,8 @@ def GetReps(model,context_id,layer_id,head_id,pos_type,rep_type,outputs,token_id
         if args.intervention_type=='swap':
             return mat
         else:
-            correct_option = ['option_1','option_2'][context_id]
-            incorrect_option = ['option_2','option_1'][context_id]
+            correct_option = ['option_1','option_2'][context_id-1]
+            incorrect_option = ['option_2','option_1'][context_id-1]
             if args.intervention_type=='correct_option_attn':
                 mat = FixAttn(mat,token_ids,correct_option,'masks',args)
             elif args.intervention_type=='incorrect_option_attn':
@@ -345,3 +339,29 @@ def ScrambleAttn(mat,token_ids,out_pos,args):
                             for out_pos_id in token_ids[out_pos]]).to(args.device)
         mat[token_ids[out_pos],:] = patch.clone()
     return mat
+
+def ExtractQKV(vecs,pos,token_ids):
+    assert len(vecs.shape)==4
+    vecs = vecs[:,:,token_ids[pos],:]
+    if len(token_ids[pos])>1:
+        vecs = vecs.mean(dim=-2)
+    return vecs.to('cpu').numpy().squeeze()
+
+def EvaluateQKV(rep_type,result_1,result_2,interv_type_1,interv_type_2):
+    effect_list = []
+    for masked_sent_id in [1,2]:
+        for context_id in [1,2]:
+            condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
+            pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
+            if interv_type_1=='original':
+                vec_1 = result_1[f'{rep_type}_{condition_id}']
+            else:
+                vec_1 = result_1[f'{rep_type}_{condition_id}'][interv_type_1]
+            if interv_type_2=='original':
+                vec_2 = result_2[f'{rep_type}_{pair_condition_id}']
+            else:
+                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][interv_type_2]
+            #effect_list.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
+            #                            np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)))
+            effect_list.append(np.linalg.norm(vec_1-vec_2,axis=-1))
+    return np.array(effect_list).mean(axis=0)
