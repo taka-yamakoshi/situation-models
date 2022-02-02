@@ -144,7 +144,7 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
             if not use_skeleton:
                 outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
             else:
-                default_outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
+                default_outputs = [model(masked_sent.expand(args.num_heads,-1).to(args.device)) for masked_sent in masked_sents]
                 outputs = [skeleton_model(0,default_output[1][0],model,{},args) for default_output in default_outputs]
                 for default_output,output in zip(default_outputs,outputs):
                     for default_hidden,hidden in zip(default_output[1],output[1]):
@@ -346,21 +346,15 @@ def ExtractQKV(vecs,pos,token_ids):
     assert len(vecs.shape)==4
     return vecs.to('cpu').numpy()
 
-def EvaluateQKV(rep_type,result_1,result_2,interv_type_1,interv_type_2):
+def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2):
     effect_list_dist = []
     effect_list_cos = []
     for masked_sent_id in [1,2]:
         for context_id in [1,2]:
             condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
             pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
-            if interv_type_1=='original':
-                vec_1 = result_1[f'{rep_type}_{condition_id}'][0]
-            else:
-                vec_1 = result_1[f'{rep_type}_{condition_id}'][interv_type_1]
-            if interv_type_2=='original':
-                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][0]
-            else:
-                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][interv_type_2]
+            vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]
+            vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][head_id_2]
             assert len(vec_1.shape)==3 and len(vec_2.shape)==3
             effect_list_dist.append(np.linalg.norm(vec_1-vec_2,axis=-1).mean(axis=-1))
             effect_list_cos.append(np.divide(np.sum(vec_1*vec_2,axis=-1),

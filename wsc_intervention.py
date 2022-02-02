@@ -87,7 +87,7 @@ def ApplyInterventionsLayer(interventions,model,pos_types,rep_types,outputs,toke
         for context_id in [1,2]:
             condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
             assert len(outputs[condition_id][1][0].shape)==3
-            int_outputs[condition_id] = skeleton_model(0,outputs[condition_id][1][0].expand(model.config.num_attention_heads,-1,-1),
+            int_outputs[condition_id] = skeleton_model(0,outputs[condition_id][1][0],
                                                         model,interventions[condition_id],args)
             pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
             for feature in ['options','option_1','option_2','context','masks','other','period','cls','sep']:
@@ -180,6 +180,15 @@ def CheckNumTokens(outputs_1,outputs_2,token_ids_1,token_ids_2):
     else:
         return False
 
+def EvaluateResults(result,head_id,num_heads):
+    llr_1 = result['ave_1'][0][head_id]-result['ave_1'][1][head_id]
+    llr_2 = result['ave_2'][0][head_id]-result['ave_2'][1][head_id]
+    attn_1 = np.array([result['masks-option-diff_1'][head_id,target_head_id]
+                        for target_head_id in range(num_heads)])
+    attn_2 = np.array([result['masks-option-diff_2'][head_id,target_head_id]
+                        for target_head_id in range(num_heads)])
+    score = (llr_1>0)&(llr_2<0)
+    return llr_1,llr_2,attn_1,attn_2,score
 
 if __name__=='__main__':
     start = time.time()
@@ -274,38 +283,26 @@ if __name__=='__main__':
                 continue
             else:
                 sent_num += 1
-                original_1 = results['original']['ave_1'][0]-results['original']['ave_1'][1]
-                original_2 = results['original']['ave_2'][0]-results['original']['ave_2'][1]
-                original_attn_1 = np.array([results['original']['masks-option-diff_1'][target_head_id]
-                                            for target_head_id in range(args.num_heads)])
-                original_attn_2 = np.array([results['original']['masks-option-diff_2'][target_head_id]
-                                            for target_head_id in range(args.num_heads)])
-                original_score = (original_1>0)&(original_2<0)
+                original_1,original_2,original_attn_1,original_attn_2,original_score = EvaluateResults(results['original'],0,args.num_heads)
 
-                original_qry_dist,original_qry_cos = EvaluateQKV('qry',results['original'],results['original'],'original','original')
-                original_key_dist,original_key_cos = EvaluateQKV('key',results['original'],results['original'],'original','original')
+                original_qry_dist,original_qry_cos = EvaluateQKV('qry',results['original'],results['original'],0,0)
+                original_key_dist,original_key_cos = EvaluateQKV('key',results['original'],results['original'],0,0)
                 for layer_id in range(args.num_layers):
                     result_dict = results[f'layer_{layer_id}']
                     for head_id in range(args.num_heads):
-                        interv_1 = result_dict['ave_1'][0][head_id]-result_dict['ave_1'][1][head_id]
-                        interv_2 = result_dict['ave_2'][0][head_id]-result_dict['ave_2'][1][head_id]
-                        interv_attn_1 = np.array([result_dict['masks-option-diff_1'][head_id,target_head_id]
-                                                    for target_head_id in range(args.num_heads)])
-                        interv_attn_2 = np.array([result_dict['masks-option-diff_2'][head_id,target_head_id]
-                                                    for target_head_id in range(args.num_heads)])
+                        interv_1,interv_2,interv_attn_1,interv_attn_2,interv_score = EvaluateResults(result_dict,head_id,args.num_heads)
 
-                        score = (interv_1>0)&(interv_2<0)
                         effect_1 = original_1-interv_1
                         effect_2 = interv_2-original_2
                         effect_attn_1 = original_attn_1-interv_attn_1
                         effect_attn_2 = interv_attn_2-original_attn_2
 
-                        interv_qry_dist,interv_qry_cos = EvaluateQKV('qry',result_dict,results['original'],head_id,'original')
-                        interv_key_dist,interv_key_cos = EvaluateQKV('key',result_dict,results['original'],head_id,'original')
+                        interv_qry_dist,interv_qry_cos = EvaluateQKV('qry',result_dict,results['original'],head_id,0)
+                        interv_key_dist,interv_key_cos = EvaluateQKV('key',result_dict,results['original'],head_id,0)
                         assert len(interv_qry_dist)==args.num_heads and len(interv_qry_cos)==args.num_heads
                         assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
-                        writer.writerow(line+['interv',layer_id,head_id,original_score,score,(effect_1+effect_2)/2,
+                        writer.writerow(line+['interv',layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
                                                 *list((interv_attn_1-interv_attn_2)/2),
                                                 *list((effect_attn_1+effect_attn_2)/2),
                                                 *list(interv_qry_dist),*list(interv_qry_cos),
