@@ -8,9 +8,9 @@ def swap_vecs(hidden,pos,head_id,vec,head_dim,args):
     assert len(hidden.shape)==3
     new_hidden = hidden.clone()
     if args.multihead:
-        new_hidden[:,:,head_dim*head_id:head_dim*(head_id+1)][:,pos,:] = vec.clone()
+        new_hidden[:,:,head_dim*head_id:head_dim*(head_id+1)][:,pos,:] = vec.to(args.device).clone()
     else:
-        new_hidden[head_id,:,head_dim*head_id:head_dim*(head_id+1)][pos,:] = vec.clone()
+        new_hidden[head_id,:,head_dim*head_id:head_dim*(head_id+1)][pos,:] = vec.to(args.device).clone()
     return new_hidden
 
 def ExtractAttnLayer(layer_id,model,args):
@@ -121,9 +121,9 @@ def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
             (hidden, attn_mat, qkv, z_rep) = layer_intervention(layer_id,layer,interventions,hidden,args)
             output_hidden.append(hidden)
             output_attn_mat.append(attn_mat)
-            output_qry.append(qkv[0])
-            output_key.append(qkv[1])
-            output_val.append(qkv[2])
-            output_z_rep.append(z_rep)
+            output_qry.append(qkv[0].to('cpu'))
+            output_key.append(qkv[1].to('cpu'))
+            output_val.append(qkv[2].to('cpu'))
+            output_z_rep.append(z_rep.to('cpu'))
         logits = lm_head(hidden)
     return (logits,output_hidden,output_attn_mat,[output_qry,output_key,output_val],output_z_rep)
