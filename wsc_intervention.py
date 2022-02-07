@@ -269,10 +269,10 @@ if __name__=='__main__':
         writer.writerow(head+['interv_type','layer_id','head_id','original_score','score','effect_ave',
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
-                                *[f'masks-qry-dist_{head_id}' for head_id in range(args.num_heads)],
-                                *[f'masks-qry-cos_{head_id}' for head_id in range(args.num_heads)],
-                                *[f'options-key-dist_{head_id}' for head_id in range(args.num_heads)],
-                                *[f'options-key-cos_{head_id}' for head_id in range(args.num_heads)]])
+                                *[f'masks-qry-dist_effect_{head_id}' for head_id in range(args.num_heads)],
+                                *[f'masks-qry-cos_effect_{head_id}' for head_id in range(args.num_heads)],
+                                *[f'options-key-dist_effect_{head_id}' for head_id in range(args.num_heads)],
+                                *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
         sent_num = 0
         for line in text[:500]:
             if args.pos_type is None:
@@ -305,13 +305,17 @@ if __name__=='__main__':
                         writer.writerow(line+['interv',layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
                                                 *list((interv_attn_1-interv_attn_2)/2),
                                                 *list((effect_attn_1+effect_attn_2)/2),
-                                                *list(interv_qry_dist),*list(interv_qry_cos),
-                                                *list(interv_key_dist),*list(interv_key_cos)])
+                                                *list(original_qry_dist-interv_qry_dist),
+                                                *list(interv_qry_cos-original_qry_cos),
+                                                *list(original_key_dist-interv_key_dist),
+                                                *list(interv_key_cos-original_key_cos)])
                         writer.writerow(line+['original',layer_id,head_id,original_score,original_score,0.0,
                                                 *list((original_attn_1-original_attn_2)/2),
                                                 *[0.0 for _ in range(args.num_heads)],
-                                                *list(original_qry_dist),*list(original_qry_cos),
-                                                *list(original_key_dist),*list(original_key_cos)])
+                                                *[0.0 for _ in range(args.num_heads)],
+                                                *[0.0 for _ in range(args.num_heads)],
+                                                *[0.0 for _ in range(args.num_heads)],
+                                                *[0.0 for _ in range(args.num_heads)]])
 
     print(f'Time it took: {time.time()-start}')
     print(f'# sentences processed: {sent_num}\n')
