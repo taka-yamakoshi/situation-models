@@ -93,6 +93,7 @@ def layer_intervention(layer_id,layer,interventions,hidden,args):
     return (new_hidden, attn_mat, [split_qry,split_key,split_val], z_rep)
 
 def skeleton_model(start_layer_id,start_hidden,model,interventions,args):
+    torch.set_num_threads(4)
     if args.model.startswith('bert'):
         core_model = model.bert
         lm_head = model.cls
