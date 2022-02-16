@@ -126,8 +126,15 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         if not args.no_mask:
             masked_sent[:,pron_start_id:pron_end_id] = mask_id
         with torch.no_grad():
-            output = model(masked_sent.to(args.device))
-
+            if not use_skeleton:
+                output = model(masked_sent.to(args.device))
+            else:
+                default_output = model(masked_sent.expand(args.num_heads,-1).to(args.device))
+                output = skeleton_model(0,default_output[1][0],model,{},args)
+                for default_hidden,hidden in zip(default_output[1],output[1]):
+                    assert torch.all(default_hidden == hidden)
+                for default_attn,attn in zip(default_output[2],output[2]):
+                    assert torch.all(default_attn == attn)
     else:
         if 'bert' in args.model:
             masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
@@ -346,13 +353,23 @@ def ExtractQKV(vecs,pos,token_ids):
     assert len(vecs.shape)==4
     return vecs.to('cpu').numpy()
 
-def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2):
+def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2,args):
     effect_list_dist = []
     effect_list_cos = []
-    for masked_sent_id in [1,2]:
-        for context_id in [1,2]:
-            condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
-            pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
+    for context_id in [1,2]:
+        if args.stimuli=='original':
+            for masked_sent_id in [1,2]:
+                condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
+                pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
+                vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]
+                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][head_id_2]
+                assert len(vec_1.shape)==3 and len(vec_2.shape)==3
+                effect_list_dist.append(np.linalg.norm(vec_1-vec_2,axis=-1).mean(axis=-1))
+                effect_list_cos.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
+                                                np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)).mean(axis=-1))
+        else:
+            condition_id = f'context_{context_id}'
+            pair_condition_id = f'context_{3-context_id}'
             vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]
             vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][head_id_2]
             assert len(vec_1.shape)==3 and len(vec_2.shape)==3
