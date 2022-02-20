@@ -84,10 +84,10 @@ if __name__ == '__main__':
                         *[option_2_word_id_1+i for i in range(len(option_2.split(' ')))],\
                         *[context_word_id+i for i in range(len(context_1.split(' ')))],\
                         len(sent_1.split(' '))-1]
-            word_ids_2 = [*[pron_word_id_2+i for i in range(len(pron_2.split(' ')))],
-                        *[option_1_word_id_2+i for i in range(len(option_1.split(' ')))],
-                        *[option_2_word_id_2+i for i in range(len(option_2.split(' ')))],
-                        *[context_word_id+i for i in range(len(context_2.split(' ')))],
+            word_ids_2 = [*[pron_word_id_2+i for i in range(len(pron_2.split(' ')))],\
+                        *[option_1_word_id_2+i for i in range(len(option_1.split(' ')))],\
+                        *[option_2_word_id_2+i for i in range(len(option_2.split(' ')))],\
+                        *[context_word_id+i for i in range(len(context_2.split(' ')))],\
                         len(sent_2.split(' '))-1]
 
             split_sent_1 = sent_1.split(' ')
@@ -98,7 +98,7 @@ if __name__ == '__main__':
             other_words_2 = [split_sent_2[word_id] for word_id in other_word_ids_2]
 
             assert len(other_words_1)==len(other_words_2)
-            if not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_1,other_words_2)]):
+            if args.stimuli=='original' and not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_1,other_words_2)]):
                 #print(other_words_1)
                 #print(other_words_2)
                 continue
@@ -108,8 +108,10 @@ if __name__ == '__main__':
                 rand_id = np.random.choice(len(other_words_1))
                 other_word_id_1 = other_word_ids_1[rand_id]
                 other_word_id_2 = other_word_ids_2[rand_id]
-                assert split_sent_1[other_word_id_1]==split_sent_2[other_word_id_2]
-                other_word = split_sent_1[other_word_id_1].strip(' ,.;:')
+                if split_sent_1[other_word_id_1]!=split_sent_2[other_word_id_2]:
+                    continue
+                else:
+                    other_word = split_sent_1[other_word_id_1].strip(' ,.;:')
 
             writer.writerow([line[head.index('pair_id')],sent_1,sent_2,
                              pron_1,pron_2,pron_word_id_1,pron_word_id_2,
