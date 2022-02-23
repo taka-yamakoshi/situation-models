@@ -375,7 +375,7 @@ def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2,args):
     effect_list_dist = []
     effect_list_cos = []
     for context_id in [1,2]:
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             for masked_sent_id in [1,2]:
                 condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
                 pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
@@ -386,6 +386,7 @@ def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2,args):
                 effect_list_cos.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
                                                 np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)).mean(axis=-1))
         else:
+            assert args.stimuli=='control_combined'
             condition_id = f'context_{context_id}'
             pair_condition_id = f'context_{3-context_id}'
             vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]

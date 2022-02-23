@@ -253,7 +253,7 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
 def CheckNumTokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args):
     features = ['option_1','option_2','context','masks','other','period','cls','sep']
     if 'verb' in args.stimuli:
-        features.append(['verb'])
+        features.append('verb')
     if outputs_1[0][0].shape[1]==outputs_2[0][0].shape[1] and outputs_1[1][0].shape[1]==outputs_2[1][0].shape[1]:
         if args.stimuli=='original' or 'verb' in args.stimuli:
             for sent_id in [1,2]:
