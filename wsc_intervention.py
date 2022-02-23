@@ -72,13 +72,14 @@ def CreateInterventionsLayers(interventions,outputs,token_ids,layer_id,head_id,p
 
 def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outputs,token_ids,args,verbose=False):
     if not bool(interventions):
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             interventions = {f'masked_sent_{masked_sent_id}_context_{context_id}':{}
                                 for masked_sent_id in [1,2] for context_id in [1,2]}
         else:
+            assert args.stimuli=='control_combined'
             interventions = {f'context_{context_id}':{} for context_id in [1,2]}
     for context_id in [1,2]:
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             for masked_sent_id in [1,2]:
                 condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
                 pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
@@ -98,6 +99,7 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
                         for pair in value:
                             print(pair[0],pair[1].shape)
         else:
+            assert args.stimuli=='control_combined'
             condition_id = f'context_{context_id}'
             pair_condition_id = f'context_{3-context_id}'
             for rep_type in rep_types:
@@ -121,7 +123,7 @@ def CreateInterventions(interventions,layer_id,head_id,pos_types,rep_types,outpu
 def ApplyInterventionsLayer(interventions,model,pos_types,rep_types,outputs,token_ids,option_tokens_lists,args):
     int_outputs = {}
     for context_id in [1,2]:
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             for masked_sent_id in [1,2]:
                 condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
                 assert len(outputs[condition_id][1][0].shape)==3
@@ -131,6 +133,7 @@ def ApplyInterventionsLayer(interventions,model,pos_types,rep_types,outputs,toke
                 for feature in ['options','option_1','option_2','context','masks','other','period','cls','sep']:
                     assert torch.all(token_ids[condition_id][feature]==token_ids[pair_condition_id][feature])
         else:
+            assert args.stimuli=='control_combined'
             condition_id = f'context_{context_id}'
             assert len(outputs[condition_id][1][0].shape)==3
             int_outputs[condition_id] = skeleton_model(0,outputs[condition_id][1][0],
@@ -143,7 +146,7 @@ def ApplyInterventionsLayer(interventions,model,pos_types,rep_types,outputs,toke
 
 def OutputResults(outputs,token_ids,option_tokens_lists,args):
     out_dict = {}
-    if args.stimuli=='original':
+    if args.stimuli=='original' or 'verb' in args.stimuli:
         assert token_ids['masked_sent_1_context_1']['pron_id']==token_ids['masked_sent_2_context_1']['pron_id']
         assert token_ids['masked_sent_1_context_2']['pron_id']==token_ids['masked_sent_2_context_2']['pron_id']
         pron_token_id_1 = token_ids['masked_sent_1_context_1']['pron_id']
@@ -173,6 +176,7 @@ def OutputResults(outputs,token_ids,option_tokens_lists,args):
         out_dict['masks-option-diff_1'] = attn_1_context_1['masks-option_1']-attn_1_context_1['masks-option_2']
         out_dict['masks-option-diff_2'] = attn_2_context_2['masks-option_1']-attn_2_context_2['masks-option_2']
     else:
+        assert args.stimuli=='control_combined'
         for context_id in [1,2]:
             condition_id = f'context_{context_id}'
             out_dict[f'qry_{condition_id}'] = ExtractQKV(outputs[condition_id][3][0][-1],
@@ -194,17 +198,18 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
     assert int(line[head.index('option_1_word_id_1')]) < int(line[head.index('option_2_word_id_1')])
     assert int(line[head.index('option_1_word_id_2')]) < int(line[head.index('option_2_word_id_2')])
 
-    if args.stimuli=='original':
+    if args.stimuli=='original' or 'verb' in args.stimuli:
         outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,use_skeleton=True)
         outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,use_skeleton=True)
     else:
+        assert args.stimuli=='control_combined'
         outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,use_skeleton=True,output_for_attn=True)
         outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,use_skeleton=True,output_for_attn=True)
 
     if CheckNumTokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args) or args.no_eq_len_condition:
         outputs = {}
         token_ids = {}
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             for masked_sent_id in [1,2]:
                 outputs[f'masked_sent_{masked_sent_id}_context_1'] = outputs_1[masked_sent_id-1]
                 outputs[f'masked_sent_{masked_sent_id}_context_2'] = outputs_2[masked_sent_id-1]
@@ -213,6 +218,7 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
                 token_ids[f'masked_sent_{masked_sent_id}_context_1']['pron_id'] = token_ids_1['pron_id']
                 token_ids[f'masked_sent_{masked_sent_id}_context_2']['pron_id'] = token_ids_2['pron_id']
         else:
+            assert args.stimuli=='control_combined'
             outputs[f'context_1'] = outputs_1
             outputs[f'context_2'] = outputs_2
             token_ids[f'context_1'] = token_ids_1
@@ -245,23 +251,28 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
         return 'number of tokens did not match'
 
 def CheckNumTokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args):
+    features = ['option_1','option_2','context','masks','other','period','cls','sep']
+    if 'verb' in args.stimuli:
+        features.append(['verb'])
     if outputs_1[0][0].shape[1]==outputs_2[0][0].shape[1] and outputs_1[1][0].shape[1]==outputs_2[1][0].shape[1]:
-        if args.stimuli=='original':
+        if args.stimuli=='original' or 'verb' in args.stimuli:
             for sent_id in [1,2]:
-                for feature in ['option_1','option_2','context','masks','other','period','cls','sep']:
+                for feature in features:
                     assert torch.all(token_ids_1[f'masked_sent_{sent_id}'][feature]==token_ids_2[f'masked_sent_{sent_id}'][feature])
         else:
-            for feature in ['option_1','option_2','context','masks','other','period','cls','sep']:
+            assert args.stimuli=='control_combined'
+            for feature in features:
                 assert torch.all(token_ids_1[feature]==token_ids_2[feature])
         return True
     else:
         return False
 
 def EvaluateResults(result,head_id,args):
-    if args.stimuli=='original':
+    if args.stimuli=='original' or 'verb' in args.stimuli:
         llr_1 = result['ave_1'][0][head_id]-result['ave_1'][1][head_id]
         llr_2 = result['ave_2'][0][head_id]-result['ave_2'][1][head_id]
     else:
+        assert args.stimuli=='control_combined'
         llr_1, llr_2 = 0.0, 0.0
     attn_1 = np.array([result['masks-option-diff_1'][head_id,target_head_id]
                         for target_head_id in range(args.num_heads)])
@@ -276,7 +287,8 @@ if __name__=='__main__':
     parser.add_argument('--model', type = str, required = True)
     parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
     parser.add_argument('--stimuli', type = str,
-                        choices=['original','control_gender','control_number','control_combined'],
+                        choices=['original','control_gender','control_number',
+                                'control_combined','original_verb','control_combined_verb'],
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)

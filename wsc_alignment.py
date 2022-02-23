@@ -1,7 +1,7 @@
 import numpy as np
 
 def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=False):
-    assert target_name in ['pron','choice','context','period','other']
+    assert target_name in ['pron','choice','context','verb','period','other']
     if target_name=='period':
         # if you didn't include <|endoftext|> token for gpt2 you need to fix here
         if 'bert' in args.model:
@@ -34,7 +34,7 @@ def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=
         return target_start_id,target_end_id
 
 def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose=False):
-    assert target_name in ['pron','masks','choice','context','period','other']
+    assert target_name in ['pron','masks','choice','context','verb','period','other']
     if target_name=='period':
         recreated_target = tokenizer.decode(input_sent[0][start_id])
         assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target

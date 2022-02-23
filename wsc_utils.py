@@ -11,12 +11,16 @@ def LoadDataset(args):
     if args.dataset=='superglue':
         if args.stimuli=='original':
             fname = 'datafile/SuperGLUE_wsc_new.csv'
+        elif args.stimuli=='original_verb':
+            fname = 'datafile/SuperGLUE_wsc_verb_new.csv'
         #elif args.stimuli=='control_gender':
         #    fname = 'datafile/SuperGLUE_wsc_new_control_gender.csv'
         #elif args.stimuli=='control_number':
         #    fname = 'datafile/SuperGLUE_wsc_new_control_number.csv'
         elif args.stimuli=='control_combined':
             fname = 'datafile/SuperGLUE_wsc_control_combined_new.csv'
+        elif args.stimuli=='control_combined_verb':
+            fname = 'datafile/SuperGLUE_wsc_control_combined_verb_new.csv'
     elif args.dataset=='winogrande':
         fname = f'datafile/winogrande_{args.size}.csv'
 
@@ -96,6 +100,12 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     option_2_word_id = int(line[head.index(f'option_2_word_id_{sent_id}')])
     context = line[head.index(f'context_{sent_id}')]
     context_word_id = int(line[head.index(f'context_word_id')])
+    if 'verb' in args.stimuli:
+        verb = line[head.index(f'verb_{sent_id}')]
+        verb_word_id = int(line[head.index(f'verb_word_id_{sent_id}')])
+    else:
+        verb = None
+        verb_word_id = None
     other = line[head.index(f'other')]
     other_word_id = int(line[head.index(f'other_word_id_{sent_id}')])
 
@@ -104,6 +114,10 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     option_1_start_id,option_1_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_1,option_1_word_id)
     option_2_start_id,option_2_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_2,option_2_word_id)
     context_start_id,context_end_id = AlignTokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
+    if 'verb' in args.stimuli:
+        verb_start_id,verb_end_id = AlignTokens(args,'verb',tokenizer,sent,input_sent,verb,verb_word_id)
+    else:
+        verb_start_id,verb_end_id = 0,0
     other_start_id,other_end_id = AlignTokens(args,'other',tokenizer,sent,input_sent,other,other_word_id)
     period_id = AlignTokens(args,'period',tokenizer,sent,input_sent,None,None)
 
@@ -170,11 +184,12 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         aligned_token_ids['option_2'] = option_ids[1]
         aligned_token_ids['context'] = np.array([context_start_id,context_end_id])
         aligned_token_ids['masks'] = np.array([pron_start_id,pron_end_id])
+        aligned_token_ids['verb'] = np.array([verb_start_id,verb_end_id])
         aligned_token_ids['other'] = np.array([other_start_id,other_end_id])
         aligned_token_ids['period'] = period_id
 
         output_token_ids = CheckRealignment(tokenizer,mask_id,masked_sent,
-                                            options,context,other,aligned_token_ids,
+                                            options,context,verb,other,aligned_token_ids,
                                             mask_context,context_length,mask_length,
                                             pron,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
@@ -191,20 +206,23 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
             aligned_token_ids[f'masked_sent_{i+1}']['option_2'] = option_ids[1]+shift*(pron_start_id<option_ids[1][0])
             aligned_token_ids[f'masked_sent_{i+1}']['context'] = np.array([context_start_id,context_end_id])+shift*(pron_start_id<context_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['masks'] = np.array([pron_start_id,pron_start_id+mask_length])
+            aligned_token_ids[f'masked_sent_{i+1}']['verb'] = np.array([verb_start_id,verb_end_id])+shift*(pron_start_id<verb_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['other'] = np.array([other_start_id,other_end_id])+shift*(pron_start_id<other_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+shift
 
             output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(tokenizer,mask_id,masked_sents[i],
-                                                                        options,context,other,aligned_token_ids[f'masked_sent_{i+1}'],
+                                                                        options,context,verb,other,aligned_token_ids[f'masked_sent_{i+1}'],
                                                                         mask_context,context_length,mask_length,
                                                                         masked_option,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
 
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
-def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
+def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,verb,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
     CheckAlignment('choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
     CheckAlignment('choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+    if 'verb' in args.stimuli:
+        CheckAlignment('verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
     CheckAlignment('other',tokenizer,masked_sent,other,*aligned_token_ids['other'])
     if mask_context:
         CheckAlignment('context',tokenizer,masked_sent,
@@ -234,7 +252,7 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,other,aligned
                         aligned_token_ids['period']+1)
 
     output_token_ids = {}
-    for feature in ['option_1','option_2','context','masks','other']:
+    for feature in ['option_1','option_2','context','verb','masks','other']:
         output_token_ids[feature] = torch.tensor([i for i in range(*aligned_token_ids[feature])]).to(args.device)
     output_token_ids['period'] = torch.tensor([aligned_token_ids['period']]).to(args.device)
     output_token_ids['cls'] = torch.tensor([0]).to(args.device)
@@ -263,7 +281,7 @@ def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
 def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
-    assert pos_type in ['','option_1','option_2','context','masks','period','cls','sep','other','options']
+    assert pos_type in ['','option_1','option_2','context','verb','masks','period','cls','sep','other','options']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     num_heads = args.num_heads
     head_dim = args.head_dim
