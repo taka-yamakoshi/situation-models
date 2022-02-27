@@ -199,12 +199,16 @@ def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,arg
     assert int(line[head.index('option_1_word_id_2')]) < int(line[head.index('option_2_word_id_2')])
 
     if args.stimuli=='original' or 'verb' in args.stimuli:
-        outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,use_skeleton=True)
-        outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,use_skeleton=True)
+        outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,
+                                                                    use_skeleton=True,mask_context=args.mask_context)
+        outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,
+                                                                    use_skeleton=True,mask_context=args.mask_context)
     else:
         assert args.stimuli=='control_combined'
-        outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,use_skeleton=True,output_for_attn=True)
-        outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,use_skeleton=True,output_for_attn=True)
+        outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,
+                                                                    use_skeleton=True,mask_context=args.mask_context,output_for_attn=True)
+        outputs_2,token_ids_2,option_tokens_list_2,_ = CalcOutputs(head,line,2,model,tokenizer,mask_id,args,
+                                                                    use_skeleton=True,mask_context=args.mask_context,output_for_attn=True)
 
     if CheckNumTokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args) or args.no_eq_len_condition:
         outputs = {}
@@ -308,7 +312,8 @@ if __name__=='__main__':
     parser.add_argument('--cascade',dest='cascade',action='store_true')
     parser.add_argument('--multihead',dest='multihead',action='store_true')
     parser.add_argument('--no_mask',dest='no_mask',action='store_true')
-    parser.set_defaults(test=False,no_eq_len_condition=False,cascade=False,multihead=False,no_mask=False)
+    parser.add_argument('--mask_context',dest='mask_context',action='store_true')
+    parser.set_defaults(test=False,no_eq_len_condition=False,cascade=False,multihead=False,no_mask=False,mask_context=False)
     args = parser.parse_args()
     print(f'running with {args}')
 
@@ -330,6 +335,10 @@ if __name__=='__main__':
         multihead_id = '_multihead'
     else:
         multihead_id = ''
+    if args.mask_context:
+        mask_context_id = '_mask_context'
+    else:
+        mask_context_id = ''
 
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
@@ -341,19 +350,19 @@ if __name__=='__main__':
     if args.pos_type is None:
         if args.dataset=='superglue':
             out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
-                            +f'_{args.rep_type}_{args.model}_{args.stimuli}'\
+                            +f'_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}{mask_context_id}_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
     else:
         if args.dataset=='superglue':
             out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
-                            +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}'\
+                            +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}{mask_context_id}_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
 
