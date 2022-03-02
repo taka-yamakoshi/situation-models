@@ -7,6 +7,7 @@ import csv
 import argparse
 import itertools
 import difflib
+import spacy
 
 def FindWord(sent,phrase):
     split_sent = sent.split(' ')
@@ -40,11 +41,39 @@ def FindContext(sent_1,sent_2):
     context_2 = ' '.join(context_words_2)
     return context_1, context_2
 
+def FindPOS(nlp,sent,word,word_id):
+    sent_before_target = ' '.join(sent.split(' ')[:word_id])
+    sent_until_target = ' '.join(sent.split(' ')[:word_id]+word.split(' '))
+    target_start_id = len(nlp(sent_before_target))
+    target_end_id = len(nlp(sent_until_target))
+    doc = nlp(sent)
+    assert word==doc[target_start_id:target_end_id].text
+    pos_labels = [token.pos_ for token in doc][target_start_id:target_end_id]
+    tag_labels = [token.tag_ for token in doc][target_start_id:target_end_id]
+    return '+'.join([simplify_pos(pos_label,tag_label) for pos_label,tag_label in zip(pos_labels,tag_labels)])
+
+def simplify_pos(pos_label,tag_label):
+    if pos_label in ['SCONJ','CCONJ']:
+        return 'CONJ'
+    elif pos_label in ['ADV','ADJ']:
+        return 'MOD'
+    elif pos_label=='VERB' and tag_label in ['VBG','VBN']:
+        return 'MOD'
+    elif pos_label=='AUX':
+        return 'VERB'
+    elif pos_label=='PROPN':
+        return 'NOUN'
+    else:
+        return pos_label
+
+
 if __name__=='__main__':
     np.random.seed(seed=2021)
     parser = argparse.ArgumentParser()
     parser.add_argument('--size', type = str, required = True, choices=['xs','s','m','l','xl','debiased'])
     args = parser.parse_args()
+
+    nlp = spacy.load('en_core_web_lg')
 
     with open(f'winogrande_1.1/train_{args.size}.jsonl','r') as f:
         file = f.readlines()
@@ -106,7 +135,7 @@ if __name__=='__main__':
                 'option_1_word_id_1','option_2_word_id_1',
                 'option_1_word_id_2','option_2_word_id_2',
                 'context_1','context_2','context_word_id',
-                'other','other_word_id_1','other_word_id_2']
+                'other','other_word_id_1','other_word_id_2','context_pos']
         writer.writerow(head)
         for key,value in wsc_data.items():
             if len(value)==2:
@@ -139,6 +168,7 @@ if __name__=='__main__':
                     schema_data_all[f'option_1_word_id_{sent_id}'] = schema_data['option_1_word_id']
                     schema_data_all[f'option_2_word_id_{sent_id}'] = schema_data['option_2_word_id']
 
+                # Identify the context word
                 context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
                 #if len(context_1.split(' '))>5 or len(context_2.split(' '))>5:
                 #    continue
@@ -157,6 +187,22 @@ if __name__=='__main__':
                 schema_data_all['context_2'] = context_2.strip(' ,.;:')
                 schema_data_all['context_word_id'] = context_word_id_1
 
+                context_1_pos = FindPOS(nlp,schema_data_all['sent_1'],
+                                        schema_data_all['context_1'],schema_data_all['context_word_id'])
+                context_2_pos = FindPOS(nlp,schema_data_all['sent_2'],
+                                        schema_data_all['context_2'],schema_data_all['context_word_id'])
+                matched_ids = difflib.SequenceMatcher(None,context_1_pos,context_2_pos).find_longest_match(0,len(context_1_pos),0,len(context_2_pos))
+                matched_pos_1 = context_1_pos[matched_ids[0]:matched_ids[0]+matched_ids[2]]
+                matched_pos_2 = context_2_pos[matched_ids[1]:matched_ids[1]+matched_ids[2]]
+                assert matched_pos_1 == matched_pos_2
+                shared_pos = matched_pos_1
+                if shared_pos=='':
+                    shared_pos = 'mismatch'
+                    print(context_1,context_2,context_1_pos,context_2_pos)
+                schema_data_all['context_pos'] = shared_pos
+
+
+                # Sample the "other word"
                 split_sent_list = []
                 other_word_ids_list = []
                 other_words_list = []
