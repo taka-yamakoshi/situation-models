@@ -195,7 +195,9 @@ if __name__=='__main__':
                 matched_pos_1 = context_1_pos[matched_ids[0]:matched_ids[0]+matched_ids[2]]
                 matched_pos_2 = context_2_pos[matched_ids[1]:matched_ids[1]+matched_ids[2]]
                 assert matched_pos_1 == matched_pos_2
-                shared_pos = matched_pos_1
+                # This is just a heuristic to make sure the identified pos is a valid one
+                # TODO: find a more systematic way to identify shared POS
+                shared_pos = '+'.join([pos_label for pos_label in matched_pos_1.split('+') if len(pos_label)>1])
                 if shared_pos=='':
                     shared_pos = 'mismatch'
                     print(context_1,context_2,context_1_pos,context_2_pos)
