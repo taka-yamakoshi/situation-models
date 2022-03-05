@@ -66,6 +66,42 @@ def simplify_pos(pos_label,tag_label):
     else:
         return pos_label
 
+def FindVerb(nlp,sent,pron,pron_word_id):
+    sent_before_target = ' '.join(sent.split(' ')[:pron_word_id])
+    sent_until_target = ' '.join(sent.split(' ')[:pron_word_id]+pron.split(' '))
+    target_start_id = len(nlp(sent_before_target))
+    target_end_id = len(nlp(sent_until_target))
+    assert target_end_id-target_start_id==1
+
+    doc = nlp(sent)
+    masked_token = doc[target_start_id]
+    assert masked_token.text==pron
+    assert masked_token.pos_ in ['PRON','NOUN','PROPN']
+
+    head_token = masked_token.head
+    dep_depth_count = 0
+    while head_token.pos_== 'NOUN':
+        head_token = head_token.head
+        dep_depth_count += 1
+        assert dep_depth_count<10
+
+    if head_token.pos_=='ADJ':
+        children_pos_list = [token.pos_ for token in head_token.children]
+        children_ids = [token.i for token in head_token.children]
+        if 'AUX' not in children_pos_list:
+            print(f'{sent} {children_pos_list}')
+            return None, None
+        else:
+            verb_id = children_ids[children_pos_list.index('AUX')]
+            assert doc[verb_id].pos_=='AUX'
+    else:
+        verb_id = head_token.i
+
+    if doc[verb_id].pos_ in ['VERB','AUX']:
+        return verb_id,doc[verb_id]
+    else:
+        print(f'{sent} {doc[verb_id].pos_}')
+        return None, None
 
 if __name__=='__main__':
     np.random.seed(seed=2021)
@@ -135,7 +171,8 @@ if __name__=='__main__':
                 'option_1_word_id_1','option_2_word_id_1',
                 'option_1_word_id_2','option_2_word_id_2',
                 'context_1','context_2','context_word_id',
-                'other','other_word_id_1','other_word_id_2','context_pos']
+                'other','other_word_id_1','other_word_id_2','context_pos',
+                'verb','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
         writer.writerow(head)
         for key,value in wsc_data.items():
             if len(value)==2:
@@ -239,5 +276,21 @@ if __name__=='__main__':
                 schema_data_all[f'other_word_id_1'] = other_word_id_1
                 schema_data_all[f'other_word_id_2'] = other_word_id_2
                 schema_data_all[f'other'] = other_word
+
+                verb_word_id_1,verb_1 = FindVerb(nlp,schema_data_all[f'sent_1'],
+                                                    schema_data_all[f'pron_1'],
+                                                    schema_data_all[f'pron_word_id_1'])
+                verb_word_id_2,verb_2 = FindVerb(nlp,schema_data_all[f'sent_2'],
+                                                    schema_data_all[f'pron_2'],
+                                                    schema_data_all[f'pron_word_id_2'])
+                if verb_1 is None or verb_2 is None:
+                    continue
+
+                assert verb_1.text==verb_2.text and verb_1.pos_==verb_2.pos_ and verb_1.tag_==verb_2.tag_
+                schema_data_all['verb'] = verb_1.text
+                schema_data_all['verb_word_id_1'] = verb_word_id_1
+                schema_data_all['verb_word_id_2'] = verb_word_id_2
+                schema_data_all['verb_pos'] = verb_1.pos_
+                schema_data_all['verb_tag'] = verb_1.tag_
 
                 writer.writerow([schema_data_all[feature] for feature in head])
