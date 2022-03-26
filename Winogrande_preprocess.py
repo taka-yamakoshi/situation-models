@@ -76,38 +76,39 @@ def FindVerb(nlp,sent,pron,pron_word_id):
     doc = nlp(sent)
     masked_token = doc[target_start_id]
     assert masked_token.text==pron
-    assert masked_token.pos_ in ['PRON','NOUN','PROPN']
-
     head_token = masked_token.head
-    dep_depth_count = 0
-    while head_token.pos_== 'NOUN':
-        head_token = head_token.head
-        dep_depth_count += 1
-        assert dep_depth_count<10
 
     if head_token.pos_=='ADJ':
         children_pos_list = [token.pos_ for token in head_token.children]
         children_ids = [token.i for token in head_token.children]
         if 'AUX' not in children_pos_list:
-            print(f'{sent} {children_pos_list}')
-            return None, None
+            verb_id = None
         else:
             verb_id = children_ids[children_pos_list.index('AUX')]
             assert doc[verb_id].pos_=='AUX'
     else:
         verb_id = head_token.i
 
-    if doc[verb_id].pos_ in ['VERB','AUX']:
-        return verb_id,doc[verb_id]
-    else:
-        print(f'{sent} {doc[verb_id].pos_}')
+    if verb_id is not None and doc[verb_id].pos_ not in ['VERB','AUX']:
+        verb_id = None
+
+    if verb_id is None or verb_id==0:
         return None, None
+    else:
+        sent_before_verb = doc[:verb_id].text
+        return len(sent_before_verb.split(' ')),doc[verb_id]
 
 if __name__=='__main__':
     np.random.seed(seed=2021)
     parser = argparse.ArgumentParser()
     parser.add_argument('--size', type = str, required = True, choices=['xs','s','m','l','xl','debiased'])
+    parser.add_argument('--verb', dest='verb', action = 'store_true', default = False)
     args = parser.parse_args()
+
+    if args.verb:
+        verb_id = '_verb'
+    else:
+        verb_id = ''
 
     nlp = spacy.load('en_core_web_lg')
 
@@ -163,7 +164,7 @@ if __name__=='__main__':
         wsc_data[pair_id].append(schema_data)
 
     # Select schema with exactly two sentences
-    with open(f'datafile/winogrande_{args.size}.csv','w') as f:
+    with open(f'datafile/winogrande_{args.size}{verb_id}.csv','w') as f:
         writer = csv.writer(f)
         head = ['pair_id','sent_1','sent_2','pron_1','pron_2',
                 'pron_word_id_1','pron_word_id_2',
@@ -171,8 +172,9 @@ if __name__=='__main__':
                 'option_1_word_id_1','option_2_word_id_1',
                 'option_1_word_id_2','option_2_word_id_2',
                 'context_1','context_2','context_word_id',
-                'other','other_word_id_1','other_word_id_2','context_pos',
-                'verb','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
+                'other','other_word_id_1','other_word_id_2','context_pos']
+        if args.verb:
+            head += ['verb','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
         writer.writerow(head)
         for key,value in wsc_data.items():
             if len(value)==2:
@@ -237,9 +239,33 @@ if __name__=='__main__':
                 shared_pos = '+'.join([pos_label for pos_label in matched_pos_1.split('+') if len(pos_label)>1])
                 if shared_pos=='':
                     shared_pos = 'mismatch'
-                    print(context_1,context_2,context_1_pos,context_2_pos)
+                    #print(context_1,context_2,context_1_pos,context_2_pos)
                 schema_data_all['context_pos'] = shared_pos
 
+                if args.verb:
+                    verb_word_id_1,verb_1 = FindVerb(nlp,schema_data_all[f'sent_1'],
+                                                        schema_data_all[f'pron_1'],
+                                                        schema_data_all[f'pron_word_id_1'])
+                    verb_word_id_2,verb_2 = FindVerb(nlp,schema_data_all[f'sent_2'],
+                                                        schema_data_all[f'pron_2'],
+                                                        schema_data_all[f'pron_word_id_2'])
+                    if verb_1 is None or verb_2 is None:
+                        continue
+
+                    if schema_data_all['context_word_id'] in [verb_word_id_1,verb_word_id_2]:
+                        continue
+
+                    if not (verb_1.text==verb_2.text and verb_1.pos_==verb_2.pos_ and verb_1.tag_==verb_2.tag_):
+                        continue
+
+                    if verb_1.tag_ not in ['VBP','VBZ','BES','MD']:
+                        continue
+
+                    schema_data_all['verb'] = verb_1.text
+                    schema_data_all['verb_word_id_1'] = verb_word_id_1
+                    schema_data_all['verb_word_id_2'] = verb_word_id_2
+                    schema_data_all['verb_pos'] = verb_1.pos_
+                    schema_data_all['verb_tag'] = verb_1.tag_
 
                 # Sample the "other word"
                 split_sent_list = []
@@ -251,6 +277,8 @@ if __name__=='__main__':
                                 *[schema_data_all[f'option_2_word_id_{sent_id}']+i for i in range(len(schema_data_all[f'option_2'].split(' ')))],
                                 *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_{sent_id}'].split(' ')))],
                                 len(schema_data_all[f'sent_{sent_id}'].split(' '))-1]
+                    if args.verb:
+                        word_ids += [schema_data_all[f'verb_word_id_{sent_id}']+i for i in range(len(schema_data_all['verb'].split(' ')))]
                     split_sent = schema_data_all[f'sent_{sent_id}'].split(' ')
                     other_word_ids = [i for i in range(len(split_sent)) if i not in word_ids]
                     other_words = [split_sent[word_id] for word_id in other_word_ids]
@@ -276,21 +304,5 @@ if __name__=='__main__':
                 schema_data_all[f'other_word_id_1'] = other_word_id_1
                 schema_data_all[f'other_word_id_2'] = other_word_id_2
                 schema_data_all[f'other'] = other_word
-
-                verb_word_id_1,verb_1 = FindVerb(nlp,schema_data_all[f'sent_1'],
-                                                    schema_data_all[f'pron_1'],
-                                                    schema_data_all[f'pron_word_id_1'])
-                verb_word_id_2,verb_2 = FindVerb(nlp,schema_data_all[f'sent_2'],
-                                                    schema_data_all[f'pron_2'],
-                                                    schema_data_all[f'pron_word_id_2'])
-                if verb_1 is None or verb_2 is None:
-                    continue
-
-                assert verb_1.text==verb_2.text and verb_1.pos_==verb_2.pos_ and verb_1.tag_==verb_2.tag_
-                schema_data_all['verb'] = verb_1.text
-                schema_data_all['verb_word_id_1'] = verb_word_id_1
-                schema_data_all['verb_word_id_2'] = verb_word_id_2
-                schema_data_all['verb_pos'] = verb_1.pos_
-                schema_data_all['verb_tag'] = verb_1.tag_
 
                 writer.writerow([schema_data_all[feature] for feature in head])
