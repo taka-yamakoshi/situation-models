@@ -1,4 +1,5 @@
 import numpy as np
+import torch
 
 def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=False):
     assert target_name in ['pron','choice','context','verb','period','other']
@@ -35,15 +36,16 @@ def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=
 
 def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose=False):
     assert target_name in ['pron','masks','choice','context','verb','period','other']
-    tokenized_target = tokenizer(word,return_tensors='pt')['input_ids']
     if target_name=='period':
-        assert torch.all(input_sent[0][start_id]==tokenized_target[0][1:-1])
-        #recreated_target = tokenizer.decode(input_sent[0][start_id])
-        #assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target
+        recreated_target = tokenizer.decode(input_sent[0][start_id])
+        assert '.' in recreated_target or recreated_target=='<|endoftext|>',recreated_target
     else:
-        assert torch.all(input_sent[0][start_id:end_id]==tokenized_target[0][1:-1])
-        #recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
-        #recreated_target = recreated_target.replace("' ","'").replace(" '","'").replace('" ','"').replace(' "','"').strip(' ,.;:').lower()
-        #if verbose:
-        #    print(word,recreated_target)
-        #assert recreated_target in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
+        tokenized_target = tokenizer(word,return_tensors='pt')['input_ids']
+        try:
+            assert torch.all(input_sent[0][start_id:end_id]==tokenized_target[0][1:-1])
+        except RuntimeError or AssertionError:
+            recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
+            recreated_target = recreated_target.replace("' ","'").replace(" '","'").replace('" ','"').replace(' "','"').strip(' ,.;:').lower()
+            if verbose:
+                print(word,recreated_target)
+            assert recreated_target in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
