@@ -174,7 +174,7 @@ if __name__=='__main__':
                 'context_1','context_2','context_word_id',
                 'other','other_word_id_1','other_word_id_2','context_pos']
         if args.verb:
-            head += ['verb','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
+            head += ['verb_1','verb_2','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
         writer.writerow(head)
         for key,value in wsc_data.items():
             if len(value)==2:
