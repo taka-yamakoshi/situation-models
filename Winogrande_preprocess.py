@@ -127,8 +127,8 @@ if __name__=='__main__':
         schema_data = {}
         schema_data['qID'] = qID
         schema_data['sentence'] = ' '.join([word for word in schema['sentence'].split(' ') if len(word)>0])
-        if '-' in schema_data['sentence'] or '/' in schema_data['sentence']:
-            continue
+        #if '-' in schema_data['sentence'] or '/' in schema_data['sentence']:
+        #    continue
 
         schema_data['pron'] = '_'
         pron_word_id = FindWord(schema_data['sentence'],schema_data['pron'])
@@ -211,8 +211,8 @@ if __name__=='__main__':
                 context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
                 #if len(context_1.split(' '))>5 or len(context_2.split(' '))>5:
                 #    continue
-                if "'" in context_1 or "'" in context_2 or "_" in context_1 or "_" in context_2 or "’" in context_1 or "’" in context_2:
-                    continue
+                #if "'" in context_1 or "'" in context_2 or "_" in context_1 or "_" in context_2 or "’" in context_1 or "’" in context_2:
+                #    continue
                 context_word_id_1 = FindWord(schema_data_all['sent_1'],context_1)
                 context_word_id_2 = FindWord(schema_data_all['sent_2'],context_2)
 
