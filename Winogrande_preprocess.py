@@ -279,7 +279,7 @@ if __name__=='__main__':
                                 *[schema_data_all[f'context_word_id']+i for i in range(len(schema_data_all[f'context_{sent_id}'].split(' ')))],
                                 len(schema_data_all[f'sent_{sent_id}'].split(' '))-1]
                     if args.verb:
-                        word_ids += [schema_data_all[f'verb_word_id_{sent_id}']+i for i in range(len(schema_data_all['verb'].split(' ')))]
+                        word_ids += [schema_data_all[f'verb_word_id_{sent_id}']+i for i in range(len(schema_data_all[f'verb_{sent_id}'].split(' ')))]
                     split_sent = schema_data_all[f'sent_{sent_id}'].split(' ')
                     other_word_ids = [i for i in range(len(split_sent)) if i not in word_ids]
                     other_words = [split_sent[word_id] for word_id in other_word_ids]
