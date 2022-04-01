@@ -21,7 +21,7 @@ if __name__=='__main__':
     parser.add_argument('--model', type = str, required = True)
     parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
     parser.add_argument('--stimuli', type = str,
-                        choices=['original','control_gender','control_number','control_combined'],
+                        choices=['original','original_verb','control_combined','control_combined_verb'],
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)
@@ -69,4 +69,4 @@ if __name__=='__main__':
     if args.dataset=='superglue':
         df.to_csv(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
     elif args.dataset=='winogrande':
-        df.to_csv(f'datafile/winogrande_{args.size}_prediction_{args.model}.csv')
+        df.to_csv(f'datafile/winogrande_{args.size}_{args.stimuli}_prediction_{args.model}.csv')

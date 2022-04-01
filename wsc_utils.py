@@ -22,7 +22,12 @@ def LoadDataset(args):
         elif args.stimuli=='control_combined_verb':
             fname = 'datafile/SuperGLUE_wsc_control_combined_verb_new.csv'
     elif args.dataset=='winogrande':
-        fname = f'datafile/winogrande_{args.size}.csv'
+        if args.stimuli=='original':
+            fname = f'datafile/winogrande_{args.size}.csv'
+        elif args.stimuli=='original_verb':
+            fname = f'datafile/winogrande_{args.size}_verb.csv'
+        else:
+            raise NotImplementedError
 
     with open(fname,'r') as f:
         reader = csv.reader(f)
