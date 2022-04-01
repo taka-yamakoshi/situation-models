@@ -261,7 +261,8 @@ if __name__=='__main__':
                     if verb_1.tag_ not in ['VBP','VBZ','BES','MD']:
                         continue
 
-                    schema_data_all['verb'] = verb_1.text
+                    schema_data_all['verb_1'] = verb_1.text
+                    schema_data_all['verb_2'] = verb_2.text
                     schema_data_all['verb_word_id_1'] = verb_word_id_1
                     schema_data_all['verb_word_id_2'] = verb_word_id_2
                     schema_data_all['verb_pos'] = verb_1.pos_
