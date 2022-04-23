@@ -224,35 +224,35 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
 def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,verb,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
-    CheckAlignment('choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
-    CheckAlignment('choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+    CheckAlignment(args,'choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
+    CheckAlignment(args,'choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
     if 'verb' in args.stimuli:
-        CheckAlignment('verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
-    CheckAlignment('other',tokenizer,masked_sent,other,*aligned_token_ids['other'])
+        CheckAlignment(args,'verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
+    CheckAlignment(args,'other',tokenizer,masked_sent,other,*aligned_token_ids['other'])
     if mask_context:
-        CheckAlignment('context',tokenizer,masked_sent,
+        CheckAlignment(args,'context',tokenizer,masked_sent,
                         ' '.join([tokenizer.decode([mask_id]) for _ in range(context_length)]),
                         *aligned_token_ids['context'])
     else:
-        CheckAlignment('context',tokenizer,masked_sent,context,*aligned_token_ids['context'])
+        CheckAlignment(args,'context',tokenizer,masked_sent,context,*aligned_token_ids['context'])
     if 'bert' in args.model:
         if output_for_attn and args.no_mask:
-            CheckAlignment('masks',tokenizer,masked_sent,
+            CheckAlignment(args,'masks',tokenizer,masked_sent,
                             masked_option,
                             *aligned_token_ids['masks'])
         else:
-            CheckAlignment('masks',tokenizer,masked_sent,
+            CheckAlignment(args,'masks',tokenizer,masked_sent,
                             ' '.join([tokenizer.decode([mask_id]) for _ in range(mask_length)]),
                             *aligned_token_ids['masks'])
     elif 'gpt2' in args.model:
-        CheckAlignment('masks',tokenizer,masked_sent,
+        CheckAlignment(args,'masks',tokenizer,masked_sent,
                         masked_option,
                         *aligned_token_ids['masks'])
     try:
-        CheckAlignment('period',tokenizer,masked_sent,None,aligned_token_ids['period'],None)
+        CheckAlignment(args,'period',tokenizer,masked_sent,None,aligned_token_ids['period'],None)
     except AssertionError:
         assert mask_context
-        CheckAlignment('context',tokenizer,masked_sent,tokenizer.decode([mask_id]),
+        CheckAlignment(args,'context',tokenizer,masked_sent,tokenizer.decode([mask_id]),
                         aligned_token_ids['period'],
                         aligned_token_ids['period']+1)
 

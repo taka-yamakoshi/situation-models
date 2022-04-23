@@ -9,7 +9,7 @@ def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=
             period_id = len(input_sent[0])-2
         elif 'gpt2' in args.model:
             period_id = len(input_sent[0])-1
-        CheckAlignment(target_name,tokenizer,input_sent,word,period_id,None,verbose)
+        CheckAlignment(args,target_name,tokenizer,input_sent,word,period_id,None,verbose)
         return period_id
     else:
         sent_before_target = ' '.join(sent.split(' ')[:word_id])
@@ -31,10 +31,10 @@ def AlignTokens(args,target_name,tokenizer,sent,input_sent,word,word_id,verbose=
                 target = word
         else:
             target = word
-        CheckAlignment(target_name,tokenizer,input_sent,target,target_start_id,target_end_id,verbose)
+        CheckAlignment(args,target_name,tokenizer,input_sent,target,target_start_id,target_end_id,verbose)
         return target_start_id,target_end_id
 
-def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose=False):
+def CheckAlignment(args,target_name,tokenizer,input_sent,word,start_id,end_id,verbose=False):
     assert target_name in ['pron','masks','choice','context','verb','period','other']
     if target_name=='period':
         recreated_target = tokenizer.decode(input_sent[0][start_id])
@@ -42,8 +42,11 @@ def CheckAlignment(target_name,tokenizer,input_sent,word,start_id,end_id,verbose
     else:
         tokenized_target = tokenizer(word,return_tensors='pt')['input_ids']
         try:
-            assert torch.all(input_sent[0][start_id:end_id]==tokenized_target[0][1:-1])
-        except RuntimeError or AssertionError:
+            if 'bert' in args.model:
+                assert torch.all(input_sent[0][start_id:end_id]==tokenized_target[0][1:-1])
+            elif 'gpt2' in args.model:
+                assert torch.all(input_sent[0][start_id:end_id]==tokenized_target[0][1:])
+        except (RuntimeError, AssertionError):
             recreated_target = tokenizer.decode(input_sent[0][start_id:end_id])
             recreated_target = recreated_target.replace("' ","'").replace(" '","'").replace('" ','"').replace(' "','"').strip(' ,.;:').lower()
             if verbose:
