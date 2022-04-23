@@ -32,7 +32,7 @@ if __name__=='__main__':
     model, tokenizer, mask_id, args = LoadModel(args)
 
     out_dict = {}
-    for line in text[:500]:
+    for line in text:
         choice_probs_sum_1, choice_probs_ave_1 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args)
         choice_probs_sum_2, choice_probs_ave_2 = CalcPrediction(head,line,2,model,tokenizer,mask_id,args)
         choice_probs_sum_3, choice_probs_ave_3 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args,mask_context=True)
@@ -56,7 +56,7 @@ if __name__=='__main__':
     '''
 
     data_list = []
-    for line in text[:500]:
+    for line in text:
         pair_id = line[head.index('pair_id')]
         pred_data = out_dict[pair_id]
         data_list.append(line+[pred_data['sum_1'][0]-pred_data['sum_1'][1],
