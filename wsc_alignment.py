@@ -51,4 +51,4 @@ def CheckAlignment(args,target_name,tokenizer,input_sent,word,start_id,end_id,ve
             recreated_target = recreated_target.replace("' ","'").replace(" '","'").replace('" ','"').replace(' "','"').strip(' ,.;:').lower()
             if verbose:
                 print(word,recreated_target)
-            assert recreated_target in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}'
+            assert recreated_target in [word.strip().lower(), ''.join(word.split(' ')).strip().lower()], f'check the alignment of {target_name}: {recreated_target}!={word.strip().lower()}'
