@@ -7,12 +7,14 @@ if __name__ == '__main__':
     np.random.seed(seed=2021)
     parser = argparse.ArgumentParser()
     parser.add_argument('--stimuli',type=str,
-                        choices=['original_verb','control_combined_verb'],default='original')
+                        choices=['original_verb','control_combined_verb','synonym_verb'],default='original')
     args = parser.parse_args()
     if args.stimuli=='original_verb':
         fname = 'SuperGLUE_wsc_verb'
     elif args.stimuli=='control_combined_verb':
         fname = 'SuperGLUE_wsc_control_combined_verb'
+    elif args.stimuli=='synonym_verb':
+        fname = 'SuperGLUE_wsc_synonym_verb'
 
     with open(f'datafile/{fname}.csv','r') as f:
         reader = csv.reader(f)
