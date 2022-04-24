@@ -21,6 +21,8 @@ def LoadDataset(args):
             fname = 'datafile/SuperGLUE_wsc_control_combined_new.csv'
         elif args.stimuli=='control_combined_verb':
             fname = 'datafile/SuperGLUE_wsc_control_combined_verb_new.csv'
+        elif args.stimuli=='synonym_verb':
+            fname = 'datafile/SuperGLUE_wsc_synonym_verb_new.csv'
     elif args.dataset=='winogrande':
         if args.stimuli=='original':
             fname = f'datafile/winogrande_{args.size}.csv'
