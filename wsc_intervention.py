@@ -356,7 +356,7 @@ if __name__=='__main__':
                             +f'_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{{mask_context_id}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
     else:
