@@ -195,8 +195,9 @@ def OutputResults(outputs,token_ids,option_tokens_lists,args):
     return out_dict
 
 def ApplyInterventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,args):
-    assert int(line[head.index('option_1_word_id_1')]) < int(line[head.index('option_2_word_id_1')])
-    assert int(line[head.index('option_1_word_id_2')]) < int(line[head.index('option_2_word_id_2')])
+    if args.stimuli not in ['synonym_verb']:
+        assert int(line[head.index('option_1_word_id_1')]) < int(line[head.index('option_2_word_id_1')])
+        assert int(line[head.index('option_1_word_id_2')]) < int(line[head.index('option_2_word_id_2')])
 
     if args.stimuli=='original' or 'verb' in args.stimuli:
         outputs_1,token_ids_1,option_tokens_list_1,_ = CalcOutputs(head,line,1,model,tokenizer,mask_id,args,
