@@ -282,7 +282,10 @@ def EvaluateResults(result,head_id,args):
                         for target_head_id in range(args.num_heads)])
     attn_2 = np.array([result['masks-option-diff_2'][head_id,target_head_id]
                         for target_head_id in range(args.num_heads)])
-    score = (llr_1>0)&(llr_2<0)
+    if args.stimuli in ['synonym_verb']:
+        score = (llr_1>0)&(llr_2>0)
+    else:
+        score = (llr_1>0)&(llr_2<0)
     return llr_1,llr_2,attn_1,attn_2,score
 
 if __name__=='__main__':
@@ -292,7 +295,7 @@ if __name__=='__main__':
     parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
     parser.add_argument('--stimuli', type = str,
                         choices=['original','control_gender','control_number',
-                                'control_combined','original_verb','control_combined_verb'],
+                                'control_combined','original_verb','control_combined_verb','synonym_verb'],
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)
