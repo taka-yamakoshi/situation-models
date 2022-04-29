@@ -105,6 +105,8 @@ if __name__=='__main__':
     parser.add_argument('--verb', dest='verb', action = 'store_true', default = False)
     args = parser.parse_args()
 
+    print(f'Running with {args}')
+
     if args.verb:
         verb_id = '_verb'
     else:
