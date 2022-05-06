@@ -266,7 +266,10 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,verb,other,al
     output_token_ids['sep'] = torch.tensor([-1]).to(args.device)
     output_token_ids['options'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]
                                                 +[i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
-
+    feature_names = ['option_1','option_2','context','verb','masks','other','period','cls','sep']
+    token_ids_all = [i for feature in feature_names for i in output_token_ids[feature]]
+    assert len(token_ids_all)==len(set(token_ids_all))
+    output_token_ids['rest'] = torch.tensor([i for i in range(len(masked_sent[0])) if i not in token_ids_all]).to(args.device)
     return output_token_ids
 
 def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
@@ -288,7 +291,7 @@ def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
 def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
-    assert pos_type in ['','option_1','option_2','context','verb','masks','period','cls','sep','other','options']
+    assert pos_type in ['','option_1','option_2','context','verb','masks','period','cls','sep','other','options','rest']
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     num_heads = args.num_heads
     head_dim = args.head_dim
