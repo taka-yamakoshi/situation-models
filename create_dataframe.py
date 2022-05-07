@@ -66,4 +66,4 @@ if __name__ =='__main__':
                                                      cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric])
                     loaded_df = loaded_df.assign(cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
-        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/combined/{dataset}_{rep_type}_{metric}.csv',index=False)
+        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}.csv',index=False)
