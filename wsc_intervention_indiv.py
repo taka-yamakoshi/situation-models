@@ -67,11 +67,11 @@ if __name__=='__main__':
 
     if args.dataset=='superglue':
         out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
-                        +f'_indiv_{pair_id}_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
+                        +f'_indiv_{args.pair_id}_{args.model}_{args.stimuli}{mask_context_id}'\
                         +f'_layer_{args.layer}_head_{args.head}{test_id}'
     elif args.dataset=='winogrande':
         out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
-                        +f'_indiv_{pair_id}_{args.rep_type}_{args.model}'\
+                        +f'_indiv_{args.pair_id}_{args.model}'\
                         +f'_layer_{args.layer}_head_{args.head}{test_id}'
 
     with open(f'{out_file_name}.csv','w') as f:
@@ -93,7 +93,7 @@ if __name__=='__main__':
         for rep,cascade_id,multihead_id in zip(rep_types, cascade_types, multihead_types):
             args.cascade, args.multihead = cascade_id, multihead_id
             for pos in range(seq_len):
-                results = ApplyInterventions(head,line,[f'token_{pos}'],[rep],model,tokenizer,mask_id,args)
+                results = ApplyInterventions(head,line,[f'token_{pos}'],rep.split('-'),model,tokenizer,mask_id,args)
                 if type(results) is str:
                     raise NotImplementedError("Sequence lengths do not match")
                 else:
