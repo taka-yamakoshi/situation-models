@@ -1,0 +1,76 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Import dependencies
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(tidyboot)
+```
+
+# Import data
+
+```{r}
+d <- read_csv(here('data/superglue_effect_ave_layer-query-key-value_multihead.csv'))
+#d <- read_csv(here('data/superglue_effect_ave_z_rep_cascade_multihead.csv'))
+```
+
+How many sentences?
+
+```{r}
+d %>% filter(cue_type != 'synonym') %>% pull(pair_id) %>% unique() %>% length()
+```
+
+# Visualization
+
+```{r}
+d %>%
+  filter(original_score) %>%
+  filter(cue_type %in% c('context', 'verb')) %>%
+  group_by(pair_id, cue_type, layer_id, pos_type) %>%
+  summarize(effect_ave = mean(effect_ave)) %>%
+  #group_by(cue_type, layer_id, pos_type) %>%
+  #tidyboot_mean(effect_ave, nboot = 1) %>%
+  ggplot(aes(x = as.factor(layer_id), y = effect_ave, color = cue_type)) +
+    #geom_point(alpha = 0.05) +
+    geom_boxplot(outlier.shape = NA) +
+    facet_wrap( ~ pos_type) +
+    theme_few() 
+```
+
+# Statistical analysis
+
+Run (paired) t-tests at each layer to test where differences between sentence pairs emerge
+
+```{r}
+d %>%
+  #filter(original_score) %>%
+  filter(cue_type %in% c('context', 'verb')) %>%
+  filter(pos_type == 'options') %>%
+  group_by(pair_id, cue_type, layer_id, pos_type) %>%
+  summarize(effect_ave = mean(effect_ave, rm.na = T)) %>%
+  spread(cue_type, effect_ave) %>%
+  group_by(layer_id) %>%
+  summarize(p.val = t.test(context, verb, paired = T)$p.value,
+            diff_size = mean(context - verb)) %>%
+  mutate(significance_level = case_when(p.val < 0.001 ~ '***', p.val < 0.01 ~ '**', p.val < 0.05 ~ '*', TRUE ~ 'n.s.'))
+```
+
+Run single-sample t-tests at each layer to test where differences from 0 emerge
+
+```{r}
+d %>%
+  filter(cue_type %in% c('context', 'verb')) %>%
+  filter(pos_type == 'options') %>%
+  group_by(pair_id, cue_type, layer_id, pos_type) %>%
+  summarize(effect_ave = mean(effect_ave, rm.na = T)) %>%
+  group_by(layer_id, cue_type) %>%
+  summarize(p.val = t.test(effect_ave)$p.value) %>%
+  mutate(significance_level = case_when(p.val < 0.001 ~ '***', p.val < 0.01 ~ '**', p.val < 0.05 ~ '*', TRUE ~ 'n.s.'))
+```
+
+
