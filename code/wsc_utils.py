@@ -10,24 +10,24 @@ def LoadDataset(args):
     # load the csv file
     if args.dataset=='superglue':
         if args.stimuli=='original':
-            fname = 'datafile/SuperGLUE_wsc_new.csv'
+            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_new.csv'
         elif args.stimuli=='original_verb':
-            fname = 'datafile/SuperGLUE_wsc_verb_new.csv'
+            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_verb_new.csv'
         #elif args.stimuli=='control_gender':
-        #    fname = 'datafile/SuperGLUE_wsc_new_control_gender.csv'
+        #    fname = '../dataset/SuperGLUE/SuperGLUE_wsc_new_control_gender.csv'
         #elif args.stimuli=='control_number':
-        #    fname = 'datafile/SuperGLUE_wsc_new_control_number.csv'
+        #    fname = '../dataset/SuperGLUE/SuperGLUE_wsc_new_control_number.csv'
         elif args.stimuli=='control_combined':
-            fname = 'datafile/SuperGLUE_wsc_control_combined_new.csv'
+            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_control_combined_new.csv'
         elif args.stimuli=='control_combined_verb':
-            fname = 'datafile/SuperGLUE_wsc_control_combined_verb_new.csv'
+            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_control_combined_verb_new.csv'
         elif args.stimuli=='synonym_verb':
-            fname = 'datafile/SuperGLUE_wsc_synonym_verb_new.csv'
+            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_synonym_verb_new.csv'
     elif args.dataset=='winogrande':
         if args.stimuli=='original':
-            fname = f'datafile/winogrande_{args.size}.csv'
+            fname = f'../dataset/Winogrande/winogrande_{args.size}.csv'
         elif args.stimuli=='original_verb':
-            fname = f'datafile/winogrande_{args.size}_verb.csv'
+            fname = f'../dataset/Winogrande/winogrande_{args.size}_verb.csv'
         else:
             raise NotImplementedError
 
@@ -59,11 +59,11 @@ def LoadModel(args):
         if 'medium' in args.model:
             run_dict = {'arwen':21,'beren':49,'celebrimbor':81,'durin':343,'eowyn':777}
             tokenizer = GPT2Tokenizer.from_pretrained('gpt2-medium')
-            path_to_ckpt = f"/jukebox/griffiths/situation_language/mistral_ckpt/gpt2-medium/{args.run}-x{run_dict[args.run]}-checkpoint-400000"
+            path_to_ckpt = f'{os.environ.get("MISTRAL_GPT2_CKPT_PATH")}/gpt2-medium/{args.run}-x{run_dict[args.run]}-checkpoint-400000'
         elif 'small' in args.model:
             run_dict = {'alias':21,'battlestar':49,'caprica':81,'darkmatter':343,'expanse':777}
             tokenizer = GPT2Tokenizer.from_pretrained('gpt2')
-            path_to_ckpt = f"/jukebox/griffiths/situation_language/mistral_ckpt/gpt2-small/{args.run}-x{run_dict[args.run]}-checkpoint-400000"
+            path_to_ckpt = f'{os.environ.get("MISTRAL_GPT2_CKPT_PATH")}/gpt2-small/{args.run}-x{run_dict[args.run]}-checkpoint-400000'
         model = MistralGPT2LMHeadModel.from_pretrained(path_to_ckpt)
     elif args.model.startswith('deberta'):
         from transformers import DebertaV2Tokenizer, DebertaV2ForMaskedLM

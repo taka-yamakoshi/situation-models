@@ -8,6 +8,7 @@ import argparse
 import itertools
 import difflib
 import spacy
+import os
 
 def FindWord(sent,phrase):
     split_sent = sent.split(' ')
@@ -166,7 +167,8 @@ if __name__=='__main__':
         wsc_data[pair_id].append(schema_data)
 
     # Select schema with exactly two sentences
-    with open(f'datafile/winogrande_{args.size}{verb_id}.csv','w') as f:
+    os.makedirs('Winogrande/',exist_ok=True)
+    with open(f'Winogrande/winogrande_{args.size}{verb_id}.csv','w') as f:
         writer = csv.writer(f)
         head = ['pair_id','sent_1','sent_2','pron_1','pron_2',
                 'pron_word_id_1','pron_word_id_2',

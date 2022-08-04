@@ -132,10 +132,10 @@ if __name__=='__main__':
             for key,val in attn_dict.items():
                 out_dict[line[head.index('pair_id')]][f'{key}_sent_{sent_id}'] = val
 
-
+    os.makedirs('../results/attention',exist_ok=True)
     if args.dataset=='superglue':
-        with open(f'datafile/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
+        with open(f'../results/attention/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     elif args.dataset=='winogrande':
-        with open(f'datafile/winogrande_{args.size}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl','wb') as f:
+        with open(f'../results/attention/winogrande_{args.size}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)

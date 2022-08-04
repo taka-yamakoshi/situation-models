@@ -31,6 +31,8 @@ if __name__=='__main__':
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
 
+    os.makedirs('../results/prediction/',exist_ok=True)
+
     out_dict = {}
     for line in text:
         choice_probs_sum_1, choice_probs_ave_1 = CalcPrediction(head,line,1,model,tokenizer,mask_id,args)
@@ -48,10 +50,10 @@ if __name__=='__main__':
 
     '''
     if args.dataset=='superglue':
-        with open(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.pkl','wb') as f:
+        with open(f../results/prediction/superglue_wsc_prediction_{args.model}_{args.stimuli}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     elif args.dataset=='winogrande':
-        with open(f'datafile/winogrande_{args.size}_prediction_{args.model}.pkl','wb') as f:
+        with open(f'../results/prediction/winogrande_{args.size}_prediction_{args.model}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     '''
 
@@ -67,6 +69,6 @@ if __name__=='__main__':
                                pred_data['ave_3'][0]-pred_data['ave_3'][1]])
     df = pd.DataFrame(data_list,columns=[head+['sum_1','sum_2','sum_3','ave_1','ave_2','ave_3']])
     if args.dataset=='superglue':
-        df.to_csv(f'datafile/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
+        df.to_csv(f'../results/prediction/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
     elif args.dataset=='winogrande':
-        df.to_csv(f'datafile/winogrande_{args.size}_{args.stimuli}_prediction_{args.model}.csv')
+        df.to_csv(f'../results/prediction/winogrande_{args.size}_{args.stimuli}_prediction_{args.model}.csv')

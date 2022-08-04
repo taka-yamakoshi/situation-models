@@ -16,7 +16,7 @@ if __name__ == '__main__':
     elif args.stimuli=='synonym_verb':
         fname = 'SuperGLUE_wsc_synonym_verb'
 
-    with open(f'datafile/{fname}.csv','r') as f:
+    with open(f'SuperGLUE/{fname}.csv','r') as f:
         reader = csv.reader(f)
         file = [row for row in reader]
         head = file[0]
@@ -31,7 +31,7 @@ if __name__ == '__main__':
                 'verb_1','verb_2','verb_word_id_1','verb_word_id_2',
                 'other','other_word_id_1','other_word_id_2']
 
-    with open(f'datafile/{fname}_new.csv','w') as f:
+    with open(f'SuperGLUE/{fname}_new.csv','w') as f:
         writer = csv.writer(f)
         writer.writerow(new_head)
         for line in text:

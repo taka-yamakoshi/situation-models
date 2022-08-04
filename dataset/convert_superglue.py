@@ -15,7 +15,7 @@ if __name__ == '__main__':
     elif args.stimuli=='control_combined':
         fname = 'SuperGLUE_wsc_control_combined'
 
-    with open(f'datafile/{fname}.csv','r') as f:
+    with open(f'SuperGLUE/{fname}.csv','r') as f:
         reader = csv.reader(f)
         file = [row for row in reader]
         head = file[0]
@@ -29,7 +29,7 @@ if __name__ == '__main__':
                 'context_1','context_2','context_word_id',
                 'other','other_word_id_1','other_word_id_2']
 
-    with open(f'datafile/{fname}_new.csv','w') as f:
+    with open(f'SuperGLUE/{fname}_new.csv','w') as f:
         writer = csv.writer(f)
         writer.writerow(new_head)
         for line in text:
