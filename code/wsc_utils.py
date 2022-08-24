@@ -195,7 +195,7 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         aligned_token_ids['other'] = np.array([other_start_id,other_end_id])
         aligned_token_ids['period'] = period_id
 
-        output_token_ids = CheckRealignment(tokenizer,mask_id,masked_sent,
+        output_token_ids = CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,
                                             options,context,verb,other,aligned_token_ids,
                                             mask_context,context_length,mask_length,
                                             pron,args,output_for_attn)
@@ -217,7 +217,7 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
             aligned_token_ids[f'masked_sent_{i+1}']['other'] = np.array([other_start_id,other_end_id])+shift*(pron_start_id<other_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+shift
 
-            output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(tokenizer,mask_id,masked_sents[i],
+            output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(sent_id,tokenizer,mask_id,masked_sents[i],
                                                                         options,context,verb,other,aligned_token_ids[f'masked_sent_{i+1}'],
                                                                         mask_context,context_length,mask_length,
                                                                         masked_option,args,output_for_attn)
@@ -225,7 +225,7 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
 
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
-def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,verb,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
+def CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
     CheckAlignment(args,'choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
     CheckAlignment(args,'choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
     if 'verb' in args.stimuli:
@@ -272,6 +272,8 @@ def CheckRealignment(tokenizer,mask_id,masked_sent,options,context,verb,other,al
     output_token_ids['rest'] = torch.tensor([i for i in range(len(masked_sent[0])) if i not in token_ids_all]).to(args.device)
     for i in range(len(masked_sent[0])):
         output_token_ids[f'token_{i}'] = torch.tensor([i]).to(args.device)
+    output_token_ids['option_correct'] = output_token_ids[f'option_{sent_id}'].clone()
+    output_token_ids['option_incorrect'] = output_token_ids[f'option_{3-sent_id}'].clone()
     return output_token_ids
 
 def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
@@ -293,7 +295,7 @@ def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
 def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
-    assert pos_type in ['','option_1','option_2','context','verb','masks','period','cls','sep','other','options','rest'] or pos_type.startswith('token')
+    assert pos_type in ['','option_1','option_2','option_correct','option_incorrect','context','verb','masks','period','cls','sep','other','options','rest'] or pos_type.startswith('token')
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     num_heads = args.num_heads
     head_dim = args.head_dim
