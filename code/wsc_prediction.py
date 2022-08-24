@@ -1,3 +1,4 @@
+# export MY_DATA_PATH='YOUR PATH TO DATA FILES'
 import numpy as np
 import torch
 import pickle
@@ -7,6 +8,7 @@ import json
 import csv
 from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel
 import pandas as pd
+import os
 
 def CalcPrediction(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
     outputs, token_ids, option_tokens_list, masked_sents = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context)
@@ -31,7 +33,7 @@ if __name__=='__main__':
     head,text = LoadDataset(args)
     model, tokenizer, mask_id, args = LoadModel(args)
 
-    os.makedirs('../results/prediction/',exist_ok=True)
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/prediction/',exist_ok=True)
 
     out_dict = {}
     for line in text:
@@ -69,6 +71,6 @@ if __name__=='__main__':
                                pred_data['ave_3'][0]-pred_data['ave_3'][1]])
     df = pd.DataFrame(data_list,columns=[head+['sum_1','sum_2','sum_3','ave_1','ave_2','ave_3']])
     if args.dataset=='superglue':
-        df.to_csv(f'../results/prediction/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
+        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/prediction/superglue_wsc_prediction_{args.model}_{args.stimuli}.csv')
     elif args.dataset=='winogrande':
-        df.to_csv(f'../results/prediction/winogrande_{args.size}_{args.stimuli}_prediction_{args.model}.csv')
+        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/prediction/winogrande_{args.size}_{args.stimuli}_prediction_{args.model}.csv')

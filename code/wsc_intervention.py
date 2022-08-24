@@ -351,22 +351,24 @@ if __name__=='__main__':
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/',exist_ok=True)
+
     if args.pos_type is None:
         if args.dataset=='superglue':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
                             +f'_{args.rep_type}_{args.model}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
     else:
         if args.dataset=='superglue':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/superglue_wsc_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}_{args.stimuli}{mask_context_id}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
         elif args.dataset=='winogrande':
-            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
+            out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
                             +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
                             +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
 

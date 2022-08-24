@@ -1,3 +1,4 @@
+# export MY_DATA_PATH='YOUR PATH TO DATA FILES'
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
@@ -6,6 +7,7 @@ import torch.nn.functional as F
 import argparse
 import json
 import csv
+import os
 from wsc_utils import CalcOutputs, LoadDataset, LoadModel
 
 def convert_to_numpy(attn):
@@ -123,7 +125,7 @@ if __name__=='__main__':
     model, tokenizer, mask_id, args = LoadModel(args)
 
     out_dict = {}
-    for line in text[:500]:
+    for line in text:
         attn_dict_1 = CalcAttn(head,line,1,model,tokenizer,mask_id,args)
         attn_dict_2 = CalcAttn(head,line,2,model,tokenizer,mask_id,args)
 
@@ -132,10 +134,10 @@ if __name__=='__main__':
             for key,val in attn_dict.items():
                 out_dict[line[head.index('pair_id')]][f'{key}_sent_{sent_id}'] = val
 
-    os.makedirs('../results/attention',exist_ok=True)
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/attention',exist_ok=True)
     if args.dataset=='superglue':
-        with open(f'../results/attention/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
+        with open(f'{os.environ.get("MY_DATA_PATH")}/attention/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)
     elif args.dataset=='winogrande':
-        with open(f'../results/attention/winogrande_{args.size}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl','wb') as f:
+        with open(f'{os.environ.get("MY_DATA_PATH")}/attention/winogrande_{args.size}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl','wb') as f:
             pickle.dump(out_dict,f)
