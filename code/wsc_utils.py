@@ -266,7 +266,10 @@ def CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,
     output_token_ids['sep'] = torch.tensor([-1]).to(args.device)
     output_token_ids['options'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]
                                                 +[i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
-    feature_names = ['option_1','option_2','context','verb','masks','other','period','cls','sep']
+    if 'verb' in args.stimuli:
+        feature_names = ['option_1','option_2','context','verb','masks','period','cls','sep']
+    else:
+        feature_names = ['option_1','option_2','context','masks','period','cls','sep']
     token_ids_all = [i for feature in feature_names for i in output_token_ids[feature]]
     assert len(token_ids_all)==len(set(token_ids_all))
     output_token_ids['rest'] = torch.tensor([i for i in range(len(masked_sent[0])) if i not in token_ids_all]).to(args.device)
