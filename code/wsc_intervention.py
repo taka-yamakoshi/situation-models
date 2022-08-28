@@ -172,7 +172,7 @@ def apply_interventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,ar
 
         for layer_id in range(model.config.num_hidden_layers):
             if str(layer_id) in args.layer.split('-') or args.layer=='all':
-                interventions = []
+                interventions = {}
                 for head_id in range(model.config.num_attention_heads):
                     if str(head_id) in args.head.split('-') or args.head=='all':
                         interventions = create_interventions(interventions,layer_id,head_id,pos_types,rep_types,
@@ -192,18 +192,13 @@ def apply_interventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,ar
         return 'number of tokens did not match'
 
 def check_num_tokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args):
-    features = ['option_1','option_2','context','masks','other','period','cls','sep']
+    features = ['option_1','option_2','context','masks','period','cls','sep']
     if 'verb' in args.stimuli:
         features.append('verb')
     if outputs_1[0][0].shape[1]==outputs_2[0][0].shape[1] and outputs_1[1][0].shape[1]==outputs_2[1][0].shape[1]:
-        if args.stimuli=='original' or 'verb' in args.stimuli:
-            for sent_id in [1,2]:
-                for feature in features:
-                    assert torch.all(token_ids_1[f'masked_sent_{sent_id}'][feature]==token_ids_2[f'masked_sent_{sent_id}'][feature])
-        else:
-            assert args.stimuli=='control_combined'
+        for sent_id in [1,2]:
             for feature in features:
-                assert torch.all(token_ids_1[feature]==token_ids_2[feature])
+                assert torch.all(token_ids_1[f'masked_sent_{sent_id}'][feature]==token_ids_2[f'masked_sent_{sent_id}'][feature])
         return True
     else:
         return False
@@ -255,8 +250,8 @@ if __name__=='__main__':
     print(f'running with {args}')
 
     # Check the consistency of the arguments
-    if 'attention' in args.rep_type.split('-'):
-        assert not args.no_eq_len_condition
+    #if 'attention' in args.rep_type.split('-'):
+    #    assert not args.no_eq_len_condition
     if args.pos_type is None:
         assert args.rep_type=='attention'
 

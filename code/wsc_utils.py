@@ -290,7 +290,7 @@ def evaluate_predictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
 def get_reps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
-    assert pos_type in ['','option_1','option_2','option_correct','option_incorrect','context','verb','masks','period','cls','sep','other','options','rest'] or pos_type.startswith('token')
+    assert pos_type in ['','option_1','option_2','option_correct','option_incorrect','context','verb','masks','period','cls','sep','options','rest'] or pos_type.startswith('token')
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     num_heads = args.num_heads
     head_dim = args.head_dim
