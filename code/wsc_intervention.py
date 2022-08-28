@@ -225,7 +225,7 @@ if __name__=='__main__':
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type = str, required = True)
-    parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
+    parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande','combined'])
     parser.add_argument('--stimuli', type = str,
                         choices=['original','control','synonym_1','synonym_2'],
                                 #,'control_gender','control_number',
@@ -263,7 +263,7 @@ if __name__=='__main__':
     head,text = load_dataset(args)
     model, tokenizer, mask_id, args = load_model(args)
     args.num_layers = model.config.num_hidden_layers
-    attn_layer = ExtractAttnLayer(0,model,args)
+    attn_layer = extract_attn_layer(0,model,args)
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
