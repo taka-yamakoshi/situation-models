@@ -8,7 +8,7 @@ import argparse
 import json
 import csv
 import os
-from wsc_utils import CalcOutputs, LoadDataset, LoadModel
+from wsc_utils import calc_outputs, load_dataset, load_model
 
 def convert_to_numpy(attn):
     return np.array([layer.to('cpu').detach().numpy() for layer in attn])
@@ -48,20 +48,20 @@ def calc_attn_norm(model,hidden,attention,args):
             attn_norm[layer_id,head_id] = torch.linalg.norm(alpha_value,dim=-1).to('cpu').detach().numpy()
     return attn_norm
 
-def EvaluateAttention(attention,token_ids,prediction_task=False,target_layer_id=None):
+def evaluate_attention(attention,token_ids,prediction_task=False,target_layer_id=None):
     attn_dict = {}
     if prediction_task:
         out_pos = 'masks'
     else:
         out_pos = 'pron_id'
     for in_pos in ['option_1','option_2','options','context','period','cls','sep','other']:
-        attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,target_layer_id)
+        attn_dict[f'{out_pos}-{in_pos}'] = extract_attention(attention,in_pos,out_pos,token_ids,target_layer_id)
     for out_pos in ['option_1','option_2','options']:
         for in_pos in ['masks','context','period','cls','sep','other']:
-            attn_dict[f'{out_pos}-{in_pos}'] = ExtractAttention(attention,in_pos,out_pos,token_ids,target_layer_id)
+            attn_dict[f'{out_pos}-{in_pos}'] = extract_attention(attention,in_pos,out_pos,token_ids,target_layer_id)
     return attn_dict
 
-def ExtractAttention(attn,in_pos,out_pos,token_ids,target_layer_id):
+def extract_attention(attn,in_pos,out_pos,token_ids,target_layer_id):
     #attn.shape=(num_layers,batch_size,num_heads,seq_len,seq_len)
     assert len(attn.shape)==5 and attn.shape[3]==attn.shape[4]
     attn = attn[:,:,:,:,token_ids[in_pos].to('cpu')]
@@ -77,8 +77,8 @@ def ExtractAttention(attn,in_pos,out_pos,token_ids,target_layer_id):
     else:
         return attn.squeeze()
 
-def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
-    output, token_ids, option_tokens_list, masked_sent = CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context, output_for_attn=True)
+def calc_attn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
+    output, token_ids, option_tokens_list, masked_sent = calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=mask_context, output_for_attn=True)
     if args.norm:
         attention = calc_attn_norm(model,output[1],output[2],args)
     else:
@@ -86,7 +86,7 @@ def CalcAttn(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False):
         if args.roll_out:
             attention = calc_attention_rollout(attention)
 
-    return EvaluateAttention(attention,token_ids)
+    return evaluate_attention(attention,token_ids)
 
 if __name__=='__main__':
     parser = argparse.ArgumentParser()
@@ -106,28 +106,17 @@ if __name__=='__main__':
     args = parser.parse_args()
     print(f'running with {args}')
 
-    if args.roll_out:
-        roll_out_id = '_roll_out'
-    else:
-        roll_out_id = ''
+    roll_out_id = '_roll_out' if args.roll_out else ''
+    norm_id = '_norm' if args.norm else ''
+    no_mask_id = '_no_mask' if args.no_mask else ''
 
-    if args.norm:
-        norm_id = '_norm'
-    else:
-        norm_id = ''
-
-    if args.no_mask:
-        no_mask_id = '_no_mask'
-    else:
-        no_mask_id = ''
-
-    head,text = LoadDataset(args)
-    model, tokenizer, mask_id, args = LoadModel(args)
+    head,text = load_dataset(args)
+    model, tokenizer, mask_id, args = load_model(args)
 
     out_dict = {}
     for line in text:
-        attn_dict_1 = CalcAttn(head,line,1,model,tokenizer,mask_id,args)
-        attn_dict_2 = CalcAttn(head,line,2,model,tokenizer,mask_id,args)
+        attn_dict_1 = calc_attn(head,line,1,model,tokenizer,mask_id,args)
+        attn_dict_2 = calc_attn(head,line,2,model,tokenizer,mask_id,args)
 
         out_dict[line[head.index('pair_id')]] = {}
         for sent_id,attn_dict in zip([1,2],[attn_dict_1,attn_dict_2]):
@@ -135,9 +124,9 @@ if __name__=='__main__':
                 out_dict[line[head.index('pair_id')]][f'{key}_sent_{sent_id}'] = val
 
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/attention',exist_ok=True)
-    if args.dataset=='superglue':
-        with open(f'{os.environ.get("MY_DATA_PATH")}/attention/superglue_wsc_attention{norm_id}_{args.model}_{args.stimuli}{roll_out_id}{no_mask_id}.pkl','wb') as f:
-            pickle.dump(out_dict,f)
-    elif args.dataset=='winogrande':
-        with open(f'{os.environ.get("MY_DATA_PATH")}/attention/winogrande_{args.size}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl','wb') as f:
-            pickle.dump(out_dict,f)
+    dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
+
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/attention/'\
+                    +f'{dataset_name}_{args.stimuli}_attention{norm_id}_{args.model}{roll_out_id}{no_mask_id}.pkl'
+    with open(f'{out_file_name}','wb') as f:
+        pickle.dump(out_dict,f)

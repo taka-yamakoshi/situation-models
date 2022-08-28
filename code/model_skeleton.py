@@ -13,7 +13,7 @@ def swap_vecs(hidden,pos,head_id,vec,head_dim,args):
         new_hidden[head_id,:,head_dim*head_id:head_dim*(head_id+1)][pos,:] = vec.to(args.device).clone()
     return new_hidden
 
-def ExtractAttnLayer(layer_id,model,args):
+def extract_attn_layer(layer_id,model,args):
     if args.model.startswith('bert'):
         layer = model.bert.encoder.layer[layer_id].attention.self
     elif args.model.startswith('roberta'):

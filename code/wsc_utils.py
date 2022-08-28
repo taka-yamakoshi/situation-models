@@ -1,12 +1,12 @@
 import numpy as np
 import torch
 import torch.nn.functional as F
-from wsc_alignment import AlignTokens, CheckAlignment
+from wsc_alignment import align_tokens, check_alignment
 from model_skeleton import skeleton_model
 import csv
 import math
 
-def LoadDataset(args):
+def load_dataset(args):
     # load the csv file
     if args.dataset=='superglue':
         if args.stimuli=='original':
@@ -17,8 +17,8 @@ def LoadDataset(args):
         #    fname = '../dataset/SuperGLUE/SuperGLUE_wsc_new_control_gender.csv'
         #elif args.stimuli=='control_number':
         #    fname = '../dataset/SuperGLUE/SuperGLUE_wsc_new_control_number.csv'
-        elif args.stimuli=='control_combined':
-            fname = '../dataset/SuperGLUE/SuperGLUE_wsc_control_combined_new.csv'
+        #elif args.stimuli=='control_combined':
+        #    fname = '../dataset/SuperGLUE/SuperGLUE_wsc_control_combined_new.csv'
         elif args.stimuli=='control_combined_verb':
             fname = '../dataset/SuperGLUE/SuperGLUE_wsc_control_combined_verb_new.csv'
         elif args.stimuli=='synonym_verb':
@@ -28,8 +28,8 @@ def LoadDataset(args):
             fname = f'../dataset/Winogrande/winogrande_{args.size}.csv'
         elif args.stimuli=='original_verb':
             fname = f'../dataset/Winogrande/winogrande_{args.size}_verb.csv'
-        else:
-            raise NotImplementedError
+    elif args.dataset=='combined':
+        fname = f'../dataset/combined/{args.stimuli}.csv'
 
     with open(fname,'r') as f:
         reader = csv.reader(f)
@@ -38,7 +38,7 @@ def LoadDataset(args):
     text = file[1:]
     return head,text
 
-def LoadModel(args):
+def load_model(args):
     # load the model
     if args.model.startswith('bert'):
         from transformers import BertTokenizer, BertForMaskedLM
@@ -77,10 +77,7 @@ def LoadModel(args):
         raise NotImplementedError("invalid model name")
 
 
-    if torch.cuda.is_available():
-        args.device = torch.device("cuda", index=int(args.core_id))
-    else:
-        args.device = torch.device("cpu")
+    args.device = torch.device("cuda", index=int(args.core_id)) if torch.cuda.is_available() else torch.device("cpu")
     model.to(args.device)
     model.eval()
     if args.model.startswith('bert') or args.model.startswith('deberta') or args.model.startswith('albert'):
@@ -94,7 +91,7 @@ def LoadModel(args):
 
     return model, tokenizer, mask_id, args
 
-def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False,use_skeleton=False):
+def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False,use_skeleton=False):
     # load data from a line in csv
     sent = line[head.index(f'sent_{sent_id}')]
     if 'gpt2' in args.model:
@@ -113,20 +110,17 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
     else:
         verb = None
         verb_word_id = None
-    other = line[head.index(f'other')]
-    other_word_id = int(line[head.index(f'other_word_id_{sent_id}')])
 
     input_sent = tokenizer(sent,return_tensors='pt')['input_ids']
-    pron_start_id,pron_end_id = AlignTokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
-    option_1_start_id,option_1_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_1,option_1_word_id)
-    option_2_start_id,option_2_end_id = AlignTokens(args,'choice',tokenizer,sent,input_sent,option_2,option_2_word_id)
-    context_start_id,context_end_id = AlignTokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
+    pron_start_id,pron_end_id = align_tokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
+    option_1_start_id,option_1_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_1,option_1_word_id)
+    option_2_start_id,option_2_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_2,option_2_word_id)
+    context_start_id,context_end_id = align_tokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
     if 'verb' in args.stimuli:
-        verb_start_id,verb_end_id = AlignTokens(args,'verb',tokenizer,sent,input_sent,verb,verb_word_id)
+        verb_start_id,verb_end_id = align_tokens(args,'verb',tokenizer,sent,input_sent,verb,verb_word_id)
     else:
         verb_start_id,verb_end_id = 0,0
-    other_start_id,other_end_id = AlignTokens(args,'other',tokenizer,sent,input_sent,other,other_word_id)
-    period_id = AlignTokens(args,'period',tokenizer,sent,input_sent,None,None)
+    period_id = align_tokens(args,'period',tokenizer,sent,input_sent,None,None)
 
     option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
                             input_sent[0][option_2_start_id:option_2_end_id]]
@@ -192,11 +186,10 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
         aligned_token_ids['context'] = np.array([context_start_id,context_end_id])
         aligned_token_ids['masks'] = np.array([pron_start_id,pron_end_id])
         aligned_token_ids['verb'] = np.array([verb_start_id,verb_end_id])
-        aligned_token_ids['other'] = np.array([other_start_id,other_end_id])
         aligned_token_ids['period'] = period_id
 
-        output_token_ids = CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,
-                                            options,context,verb,other,aligned_token_ids,
+        output_token_ids = check_re_alignment(sent_id,tokenizer,mask_id,masked_sent,
+                                            options,context,verb,aligned_token_ids,
                                             mask_context,context_length,mask_length,
                                             pron,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
@@ -214,56 +207,55 @@ def CalcOutputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fals
             aligned_token_ids[f'masked_sent_{i+1}']['context'] = np.array([context_start_id,context_end_id])+shift*(pron_start_id<context_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['masks'] = np.array([pron_start_id,pron_start_id+mask_length])
             aligned_token_ids[f'masked_sent_{i+1}']['verb'] = np.array([verb_start_id,verb_end_id])+shift*(pron_start_id<verb_start_id)
-            aligned_token_ids[f'masked_sent_{i+1}']['other'] = np.array([other_start_id,other_end_id])+shift*(pron_start_id<other_start_id)
             aligned_token_ids[f'masked_sent_{i+1}']['period'] = period_id+shift
 
-            output_token_ids[f'masked_sent_{i+1}'] = CheckRealignment(sent_id,tokenizer,mask_id,masked_sents[i],
-                                                                        options,context,verb,other,aligned_token_ids[f'masked_sent_{i+1}'],
+            output_token_ids[f'masked_sent_{i+1}'] = check_re_alignment(sent_id,tokenizer,mask_id,masked_sents[i],
+                                                                        options,context,verb,aligned_token_ids[f'masked_sent_{i+1}'],
                                                                         mask_context,context_length,mask_length,
                                                                         masked_option,args,output_for_attn)
         output_token_ids['pron_id'] = torch.tensor([pron_start_id]).to(args.device)
 
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
-def CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,other,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
-    CheckAlignment(args,'choice',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
-    CheckAlignment(args,'choice',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+def check_re_alignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
+    check_alignment(args,'option',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
+    check_alignment(args,'option',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
     if 'verb' in args.stimuli:
-        CheckAlignment(args,'verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
-    CheckAlignment(args,'other',tokenizer,masked_sent,other,*aligned_token_ids['other'])
+        check_alignment(args,'verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
     if mask_context:
-        CheckAlignment(args,'context',tokenizer,masked_sent,
+        check_alignment(args,'context',tokenizer,masked_sent,
                         ' '.join([tokenizer.decode([mask_id]) for _ in range(context_length)]),
                         *aligned_token_ids['context'])
     else:
-        CheckAlignment(args,'context',tokenizer,masked_sent,context,*aligned_token_ids['context'])
+        check_alignment(args,'context',tokenizer,masked_sent,context,*aligned_token_ids['context'])
     if 'bert' in args.model:
-        if output_for_attn and args.no_mask:
-            CheckAlignment(args,'masks',tokenizer,masked_sent,
+        if args.no_mask:
+            check_alignment(args,'masks',tokenizer,masked_sent,
                             masked_option,
                             *aligned_token_ids['masks'])
         else:
-            CheckAlignment(args,'masks',tokenizer,masked_sent,
+            check_alignment(args,'masks',tokenizer,masked_sent,
                             ' '.join([tokenizer.decode([mask_id]) for _ in range(mask_length)]),
                             *aligned_token_ids['masks'])
     elif 'gpt2' in args.model:
-        CheckAlignment(args,'masks',tokenizer,masked_sent,
+        check_alignment(args,'masks',tokenizer,masked_sent,
                         masked_option,
                         *aligned_token_ids['masks'])
     try:
-        CheckAlignment(args,'period',tokenizer,masked_sent,None,aligned_token_ids['period'],None)
+        check_alignment(args,'period',tokenizer,masked_sent,None,aligned_token_ids['period'],None)
     except AssertionError:
+        ## Context may be stuck together with the period
         assert mask_context
-        CheckAlignment(args,'context',tokenizer,masked_sent,tokenizer.decode([mask_id]),
+        check_alignment(args,'context',tokenizer,masked_sent,tokenizer.decode([mask_id]),
                         aligned_token_ids['period'],
                         aligned_token_ids['period']+1)
 
     output_token_ids = {}
-    for feature in ['option_1','option_2','context','verb','masks','other']:
+    for feature in ['option_1','option_2','context','verb','masks']:
         output_token_ids[feature] = torch.tensor([i for i in range(*aligned_token_ids[feature])]).to(args.device)
     output_token_ids['period'] = torch.tensor([aligned_token_ids['period']]).to(args.device)
     output_token_ids['cls'] = torch.tensor([0]).to(args.device)
-    output_token_ids['sep'] = torch.tensor([-1]).to(args.device)
+    output_token_ids['sep'] = torch.tensor([len(masked_sent[0])-1]).to(args.device)
     output_token_ids['options'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]
                                                 +[i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
     if 'verb' in args.stimuli:
@@ -279,7 +271,7 @@ def CheckRealignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,
     output_token_ids['option_incorrect'] = output_token_ids[f'option_{3-sent_id}'].clone()
     return output_token_ids
 
-def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
+def evaluate_predictions(logits_1,logits_2,pron_token_id,tokens_list,args):
     if 'bert' in args.model:
         probs_1 = F.log_softmax(logits_1[:, pron_token_id:(pron_token_id+len(tokens_list[0]))], dim = -1).to('cpu')
         probs_2 = F.log_softmax(logits_2[:, pron_token_id:(pron_token_id+len(tokens_list[1]))], dim = -1).to('cpu')
@@ -297,7 +289,7 @@ def EvaluatePredictions(logits_1,logits_2,pron_token_id,tokens_list,args):
                                 for token_id,token in enumerate(tokens_list[1])],axis=0).squeeze()]
     return np.array(choice_probs_sum),np.array(choice_probs_ave)
 
-def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
+def get_reps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id=None):
     assert pos_type in ['','option_1','option_2','option_correct','option_incorrect','context','verb','masks','period','cls','sep','other','options','rest'] or pos_type.startswith('token')
     assert rep_type in ['layer','key','query','value','attention','z_rep']
     num_heads = args.num_heads
@@ -334,36 +326,36 @@ def GetReps(outputs,token_ids,layer_id,head_id,pos_type,rep_type,args,context_id
             correct_option = ['option_1','option_2'][context_id-1]
             incorrect_option = ['option_2','option_1'][context_id-1]
             if args.intervention_type=='correct_option_attn':
-                mat = FixAttn(mat,token_ids,correct_option,'masks',args)
+                mat = fix_attn(mat,token_ids,correct_option,'masks',args)
             elif args.intervention_type=='incorrect_option_attn':
-                mat = FixAttn(mat,token_ids,incorrect_option,'masks',args)
+                mat = fix_attn(mat,token_ids,incorrect_option,'masks',args)
             elif args.intervention_type=='context_attn':
-                mat = FixAttn(mat,token_ids,'context','masks',args)
+                mat = fix_attn(mat,token_ids,'context','masks',args)
             elif args.intervention_type=='other_attn':
-                mat = FixAttn(mat,token_ids,'other','masks',args)
+                mat = fix_attn(mat,token_ids,'other','masks',args)
             elif args.intervention_type=='option_context_attn':
-                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+                mat = fix_attn(mat,token_ids,'context',correct_option,args)
             elif args.intervention_type=='option_masks_attn':
-                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
+                mat = fix_attn(mat,token_ids,'masks',correct_option,args)
             elif args.intervention_type=='context_context_attn':
-                mat = FixAttn(mat,token_ids,'context','masks',args)
-                mat = FixAttn(mat,token_ids,'context',correct_option,args)
+                mat = fix_attn(mat,token_ids,'context','masks',args)
+                mat = fix_attn(mat,token_ids,'context',correct_option,args)
             elif args.intervention_type=='context_masks_attn':
-                mat = FixAttn(mat,token_ids,'context','masks',args)
-                mat = FixAttn(mat,token_ids,'masks',correct_option,args)
+                mat = fix_attn(mat,token_ids,'context','masks',args)
+                mat = fix_attn(mat,token_ids,'masks',correct_option,args)
             elif args.intervention_type=='lesion_context_attn':
-                mat = FixAttn(mat,token_ids,'context','masks',args,reverse=True)
+                mat = fix_attn(mat,token_ids,'context','masks',args,reverse=True)
             elif args.intervention_type=='lesion_attn':
                 mat = torch.zeros(mat.size()).to(args.device)
             elif args.intervention_type=='scramble_masks_attn':
-                mat = ScrambleAttn(mat,token_ids,'masks',args)
+                mat = scramble_attn(mat,token_ids,'masks',args)
             else:
                 raise NotImplementedError(f'invalid intervention type: {args.intervention_type}')
             return mat
     else:
         raise NotImplementedError(f'rep_type "{rep_type}" is not supported')
 
-def FixAttn(mat,token_ids,in_pos,out_pos,args,reverse=False):
+def fix_attn(mat,token_ids,in_pos,out_pos,args,reverse=False):
     if not args.test:
         if reverse:
             patch = torch.ones((len(token_ids[out_pos]),mat.shape[1])).to(args.device)/(mat.shape[1]-len(token_ids[in_pos]))
@@ -374,7 +366,7 @@ def FixAttn(mat,token_ids,in_pos,out_pos,args,reverse=False):
         mat[token_ids[out_pos],:] = patch.clone()
     return mat
 
-def ScrambleAttn(mat,token_ids,out_pos,args):
+def scramble_attn(mat,token_ids,out_pos,args):
     if not args.test:
         rand_ids = np.random.permutation(mat.shape[1])
         patch = torch.tensor([[mat[out_pos_id][rand_id] for rand_id in rand_ids]
@@ -382,30 +374,19 @@ def ScrambleAttn(mat,token_ids,out_pos,args):
         mat[token_ids[out_pos],:] = patch.clone()
     return mat
 
-def ExtractQKV(vecs,pos,token_ids):
+def extract_QKV(vecs,pos,token_ids):
     assert len(vecs.shape)==4
     vecs = vecs[:,:,token_ids[pos],:]
     assert len(vecs.shape)==4
     return vecs.to('cpu').numpy()
 
-def EvaluateQKV(rep_type,result_1,result_2,head_id_1,head_id_2,args):
+def evaluate_QKV(rep_type,result_1,result_2,head_id_1,head_id_2,args):
     effect_list_dist = []
     effect_list_cos = []
     for context_id in [1,2]:
-        if args.stimuli=='original' or 'verb' in args.stimuli:
-            for masked_sent_id in [1,2]:
-                condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
-                pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
-                vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]
-                vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][head_id_2]
-                assert len(vec_1.shape)==3 and len(vec_2.shape)==3
-                effect_list_dist.append(np.linalg.norm(vec_1-vec_2,axis=-1).mean(axis=-1))
-                effect_list_cos.append(np.divide(np.sum(vec_1*vec_2,axis=-1),
-                                                np.linalg.norm(vec_1,axis=-1)*np.linalg.norm(vec_2,axis=-1)).mean(axis=-1))
-        else:
-            assert args.stimuli=='control_combined'
-            condition_id = f'context_{context_id}'
-            pair_condition_id = f'context_{3-context_id}'
+        for masked_sent_id in [1,2]:
+            condition_id = f'masked_sent_{masked_sent_id}_context_{context_id}'
+            pair_condition_id = f'masked_sent_{masked_sent_id}_context_{3-context_id}'
             vec_1 = result_1[f'{rep_type}_{condition_id}'][head_id_1]
             vec_2 = result_2[f'{rep_type}_{pair_condition_id}'][head_id_2]
             assert len(vec_1.shape)==3 and len(vec_2.shape)==3
