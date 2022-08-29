@@ -104,7 +104,7 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
     option_2_word_id = int(line[head.index(f'option_2_word_id_{sent_id}')])
     context = line[head.index(f'context_{sent_id}')]
     context_word_id = int(line[head.index(f'context_word_id')])
-    if 'verb' in args.stimuli:
+    if 'verb' in args.stimuli or args.dataset=='combined':
         verb = line[head.index(f'verb_{sent_id}')]
         verb_word_id = int(line[head.index(f'verb_word_id_{sent_id}')])
     else:
@@ -116,7 +116,7 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
     option_1_start_id,option_1_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_1,option_1_word_id)
     option_2_start_id,option_2_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_2,option_2_word_id)
     context_start_id,context_end_id = align_tokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
-    if 'verb' in args.stimuli:
+    if 'verb' in args.stimuli or args.dataset=='combined':
         verb_start_id,verb_end_id = align_tokens(args,'verb',tokenizer,sent,input_sent,verb,verb_word_id)
     else:
         verb_start_id,verb_end_id = 0,0
@@ -220,7 +220,7 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
 def check_re_alignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
     check_alignment(args,'option',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
     check_alignment(args,'option',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
-    if 'verb' in args.stimuli:
+    if 'verb' in args.stimuli or args.dataset=='combined':
         check_alignment(args,'verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
     if mask_context:
         check_alignment(args,'context',tokenizer,masked_sent,
@@ -258,7 +258,7 @@ def check_re_alignment(sent_id,tokenizer,mask_id,masked_sent,options,context,ver
     output_token_ids['sep'] = torch.tensor([len(masked_sent[0])-1]).to(args.device)
     output_token_ids['options'] = torch.tensor([i for i in range(*aligned_token_ids['option_1'])]
                                                 +[i for i in range(*aligned_token_ids['option_2'])]).to(args.device)
-    if 'verb' in args.stimuli:
+    if 'verb' in args.stimuli or args.dataset=='combined':
         feature_names = ['option_1','option_2','context','verb','masks','period','cls','sep']
     else:
         feature_names = ['option_1','option_2','context','masks','period','cls','sep']

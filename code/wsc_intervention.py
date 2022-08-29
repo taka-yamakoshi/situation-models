@@ -193,7 +193,7 @@ def apply_interventions(head,line,pos_types,rep_types,model,tokenizer,mask_id,ar
 
 def check_num_tokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args):
     features = ['option_1','option_2','context','masks','period','cls','sep']
-    if 'verb' in args.stimuli:
+    if 'verb' in args.stimuli or args.dataset=='combined':
         features.append('verb')
     if outputs_1[0][0].shape[1]==outputs_2[0][0].shape[1] and outputs_1[1][0].shape[1]==outputs_2[1][0].shape[1]:
         for sent_id in [1,2]:
