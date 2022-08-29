@@ -273,8 +273,8 @@ if __name__=='__main__':
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
 
     out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/'\
-                    +f'{dataset_name}_{args.stimuli}{mask_context_id}{no_eq_id}'\  # dataset property
-                    +f'_intervention_{args.intervention_type}'\ # intervention_type
+                    +f'{dataset_name}_{args.stimuli}{mask_context_id}{no_eq_id}'\
+                    +f'_intervention_{args.intervention_type}'\
                     +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
                     +f'_layer_{args.layer}_head_{args.head}{cascade_id}{multihead_id}{test_id}'
 
