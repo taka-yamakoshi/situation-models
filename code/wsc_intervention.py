@@ -269,7 +269,7 @@ if __name__=='__main__':
     multihead_id = '_multihead' if args.multihead else ''
     mask_context_id = '_mask_context' if args.mask_context else ''
     #no_eq_id = '_no_eq' if args.no_eq_len_condition else ''
-    no_eq_id _ ''
+    no_eq_id = ''
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
 
     out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/'\
