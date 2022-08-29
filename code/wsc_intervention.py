@@ -262,7 +262,7 @@ if __name__=='__main__':
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
-    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/',exist_ok=True)
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/',exist_ok=True)
 
     test_id = '_test' if args.test else ''
     cascade_id = '_cascade' if args.cascade else ''
@@ -272,7 +272,7 @@ if __name__=='__main__':
     no_eq_id = ''
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
 
-    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/'\
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/'\
                     +f'{dataset_name}_{args.stimuli}{mask_context_id}{no_eq_id}'\
                     +f'_intervention_{args.intervention_type}'\
                     +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
@@ -288,7 +288,7 @@ if __name__=='__main__':
                                 *[f'options-key-dist_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
         sent_num = 0
-        for line in text:
+        for line in text[:50]:
             if args.pos_type is None:
                 results = apply_interventions(head,line,[],args.rep_type.split('-'),model,tokenizer,mask_id,args)
             else:
