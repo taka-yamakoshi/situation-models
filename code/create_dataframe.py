@@ -45,7 +45,7 @@ if __name__ =='__main__':
         for stimuli,mask_context,cue_type in zip(stimuli_list,mask_context_list,cue_type_list):
             mask_context_id = '_mask_context' if mask_context else ''
             if rep_type=='attention':
-                file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/{dataset_name}{mask_context_id}_intervention_swap_'\
+                file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                 +f'None_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                 loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
                                                  cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric])
@@ -54,7 +54,7 @@ if __name__ =='__main__':
             else:
                 pos_types = pos_types_q_and_k if rep_type=='q_and_k' else pos_types_singles
                 for pos_type in pos_types:
-                    file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/{dataset_name}{mask_context_id}_intervention_swap_'\
+                    file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                     +f'{pos_type}_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
                                                      cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric])
