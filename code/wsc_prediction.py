@@ -30,7 +30,8 @@ if __name__=='__main__':
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)
     parser.add_argument('--mask_context',dest='mask_context',action='store_true')
-    parser.set_defaults(mask_context=False)
+    parser.add_argument('--no_mask',dest='no_mask',action='store_true')
+    parser.set_defaults(mask_context=False,no_mask=False)
     args = parser.parse_args()
     print(f'running with {args}')
 
