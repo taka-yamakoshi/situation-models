@@ -29,32 +29,32 @@ if __name__=='__main__':
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)
+    parser.add_argument('--mask_context',dest='mask_context',action='store_true')
+    parser.set_defaults(mask_context=False)
     args = parser.parse_args()
     print(f'running with {args}')
 
     head,text = load_dataset(args)
     model, tokenizer, mask_id, args = load_model(args)
+    mask_context_id = '_mask_context' if args.mask_context else ''
 
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/prediction/',exist_ok=True)
 
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
-    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/prediction/{dataset_name}_{args.stimuli}_prediction_{args.model}'
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/prediction/{dataset_name}_{args.stimuli}{mask_context_id}_prediction_{args.model}'
 
     start = time.time()
     with open(f'{out_file_name}.csv','w') as f:
         writer = csv.writer(f)
-        writer.writerow(head+['sum_1','sum_2','sum_3','ave_1','ave_2','ave_3'])
+        writer.writerow(head+['sum_1','sum_2','ave_1','ave_2'])
         for line in text:
-            choice_probs_sum_1, choice_probs_ave_1 = calc_prediction(head,line,1,model,tokenizer,mask_id,args)
-            choice_probs_sum_2, choice_probs_ave_2 = calc_prediction(head,line,2,model,tokenizer,mask_id,args)
-            choice_probs_sum_3, choice_probs_ave_3 = calc_prediction(head,line,1,model,tokenizer,mask_id,args,mask_context=True)
+            choice_probs_sum_1, choice_probs_ave_1 = calc_prediction(head,line,1,model,tokenizer,mask_id,args,mask_context=args.mask_context)
+            choice_probs_sum_2, choice_probs_ave_2 = calc_prediction(head,line,2,model,tokenizer,mask_id,args,mask_context=args.mask_context)
             writer.writerow(line+[
                                 choice_probs_sum_1[0]-choice_probs_sum_1[1],
                                 choice_probs_sum_2[0]-choice_probs_sum_2[1],
-                                choice_probs_sum_3[0]-choice_probs_sum_3[1],
                                 choice_probs_ave_1[0]-choice_probs_ave_1[1],
-                                choice_probs_ave_2[0]-choice_probs_ave_2[1],
-                                choice_probs_ave_3[0]-choice_probs_ave_3[1]])
+                                choice_probs_ave_2[0]-choice_probs_ave_2[1]])
 
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
