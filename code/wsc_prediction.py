@@ -35,16 +35,16 @@ if __name__=='__main__':
     head,text = load_dataset(args)
     model, tokenizer, mask_id, args = load_model(args)
 
-    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/prediction/tmp/',exist_ok=True)
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/prediction/',exist_ok=True)
 
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
-    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/prediction/tmp/{dataset_name}_{args.stimuli}_prediction_{args.model}'
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/prediction/{dataset_name}_{args.stimuli}_prediction_{args.model}'
 
     start = time.time()
     with open(f'{out_file_name}.csv','w') as f:
         writer = csv.writer(f)
         writer.writerow(head+['sum_1','sum_2','sum_3','ave_1','ave_2','ave_3'])
-        for line in text[:50]:
+        for line in text:
             choice_probs_sum_1, choice_probs_ave_1 = calc_prediction(head,line,1,model,tokenizer,mask_id,args)
             choice_probs_sum_2, choice_probs_ave_2 = calc_prediction(head,line,2,model,tokenizer,mask_id,args)
             choice_probs_sum_3, choice_probs_ave_3 = calc_prediction(head,line,1,model,tokenizer,mask_id,args,mask_context=True)

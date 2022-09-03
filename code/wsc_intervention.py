@@ -262,7 +262,7 @@ if __name__=='__main__':
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
-    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/',exist_ok=True)
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/',exist_ok=True)
 
     test_id = '_test' if args.test else ''
     cascade_id = '_cascade' if args.cascade else ''
@@ -272,7 +272,7 @@ if __name__=='__main__':
     no_eq_id = ''
     dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
 
-    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/tmp/'\
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/'\
                     +f'{dataset_name}_{args.stimuli}{mask_context_id}{no_eq_id}'\
                     +f'_intervention_{args.intervention_type}'\
                     +f'_{args.pos_type}_{args.rep_type}_{args.model}'\
@@ -281,6 +281,7 @@ if __name__=='__main__':
     with open(f'{out_file_name}.csv','w') as f:
         writer = csv.writer(f)
         writer.writerow(head+['interv_type','layer_id','head_id','original_score','score','effect_ave',
+                                'original_1','original_2','interv_1','interv_2','effect_1','effect_2',
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-dist_effect_{head_id}' for head_id in range(args.num_heads)],
@@ -288,7 +289,7 @@ if __name__=='__main__':
                                 *[f'options-key-dist_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
         sent_num = 0
-        for line in text[:50]:
+        for line in text:
             if args.pos_type is None:
                 results = apply_interventions(head,line,[],args.rep_type.split('-'),model,tokenizer,mask_id,args)
             else:
@@ -317,6 +318,7 @@ if __name__=='__main__':
                         assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
                         writer.writerow(line+['interv',layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
+                                                original_1,original_2,interv_1,interv_2,effect_1,effect_2,
                                                 *list((interv_attn_1-interv_attn_2)/2),
                                                 *list((effect_attn_1+effect_attn_2)/2),
                                                 *list(original_qry_dist-interv_qry_dist),
@@ -324,6 +326,7 @@ if __name__=='__main__':
                                                 *list(original_key_dist-interv_key_dist),
                                                 *list(interv_key_cos-original_key_cos)])
                         writer.writerow(line+['original',layer_id,head_id,original_score,original_score,0.0,
+                                                original_1,original_2,original_1,original_2,0.0,0.0,
                                                 *list((original_attn_1-original_attn_2)/2),
                                                 *[0.0 for _ in range(args.num_heads)],
                                                 *[0.0 for _ in range(args.num_heads)],
