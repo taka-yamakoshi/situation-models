@@ -15,7 +15,8 @@ library(tidyboot)
 # Import data
 
 ```{r}
-d <- read_csv(here('data/combined_effect_ave_layer-query-key-value_multihead.csv')) %>%
+d <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead.csv')) %>%
+  filter(head_id==0) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
 ```
 
@@ -40,6 +41,37 @@ d %>%
 ```
 
 # 1.2: Layer-wise intervention
+# Prep the data for plotting
+```{r}
+d <- d %>%
+  mutate(cue_type = replace(cue_type,cue_type=='synonym_1','synonym')) %>%
+  mutate(cue_type = replace(cue_type,cue_type=='synonym_2','synonym')) %>%
+  mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
+  mutate(layer_id = layer_id+1)
+```
+
+```{r}
+d %>%
+  filter(original_score) %>%
+  filter(pos_type %in% c('options', 'masks')) %>%
+  mutate(cue_type=factor(cue_type,levels=c('synonym','context','verb','context+verb'))) %>%
+  mutate(pos_type=factor(pos_type,levels=c('options','masks'))) %>%
+  group_by(cue_type, layer_id, pos_type) %>%
+  #summarize(effect_ave = mean(effect_ave)) %>%
+  tidyboot_mean(effect_ave, nboot = 1000) %>%
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = cue_type, group = cue_type)) +
+    geom_line(size=1.2) +
+    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.1,size=0.8) +
+    facet_grid( ~ pos_type) +
+    theme_few() +
+    scale_color_colorblind() +
+    labs(x = 'Layer', y ='Effect') +
+    geom_hline(yintercept=0) +
+    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
+          axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+          strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+ggsave('layer.pdf', units = 'in', width = 6, height = 4)
+```
 
 ```{r}
 d.mean <- d %>%
@@ -119,8 +151,16 @@ d.zrep %>%
 # 1.4: fine-grained analyses
 
 ```{r}
-d.att <- read_csv(here('data/combined_effect_ave_attention.csv')) 
-d.val <- read_csv(here('data/combined_effect_ave_value.csv')) 
+d.att <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_attention.csv'))
+d.val <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_value.csv')) 
+```
+
+```{r}
+d.head_7 <- d.val %>%
+  filter(head_id == 7) %>%
+  filter(pos_type=='context')
+d.head_44 <- d.att %>%
+  filter(head_id == 44) %>%
 ```
 
 ```{r}
