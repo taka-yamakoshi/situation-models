@@ -30,9 +30,9 @@ if __name__ =='__main__':
 
     pos_types_singles = ['options','masks'] #['options','context','masks','verb','period','cls-sep','rest']
     pos_types_q_and_k = ['options-masks','masks-options','context-masks','context-options']
-    cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2']
-    stimuli_list = ['original','control','control','synonym_1','synonym_2']
-    mask_context_list = [False,True,False,False,False]
+    cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2'] #['context','verb','context_verb','synonym_1','synonym_2']
+    stimuli_list = ['original','control','control','synonym_1','synonym_2'] #['original','control','control','synonym_1','synonym_2']
+    mask_context_list = [False,True,False,False,False] #[False,True,False,False,False]
     rep_types = ['layer-query-key-value'] #['layer-query-key-value','z_rep','z_rep','value', 'attention','q_and_k']
     cascade_list = [False] #[False,True,False,False,False,False]
     multihead_list = [True] #[True,True,False,False,False,False]
