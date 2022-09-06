@@ -15,31 +15,53 @@ library(tidyboot)
 # Import data
 
 ```{r}
-d <- read_csv(here('data/superglue_effect_ave_layer-query-key-value_multihead.csv'))
-#d <- read_csv(here('data/superglue_effect_ave_z_rep_cascade_multihead.csv'))
+d <- read_csv(here('data/combined_effect_ave_layer-query-key-value_multihead.csv')) %>%
+  separate(pair_id, into = c('prefix', 'pair_id'))
 ```
 
 How many sentences?
 
 ```{r}
-d %>% filter(cue_type != 'synonym') %>% pull(pair_id) %>% unique() %>% length()
+d %>% pull(cue_type) %>% unique()
+d %>% 
+  pull(pair_id) %>%
+  unique()
 ```
 
-# Visualization
+# 1.1: Performance
 
 ```{r}
 d %>%
+  #filter(cue_type %in% c('context', 'verb')) %>%
+  group_by(cue_type, pair_id) %>%
+  summarize(acc = mean(original_score)) %>%
+  group_by(cue_type) %>%
+  summarize(n = sum(acc))
+```
+
+# 1.2: Layer-wise intervention
+
+```{r}
+d.mean <- d %>%
   filter(original_score) %>%
-  filter(cue_type %in% c('context', 'verb')) %>%
+  #filter(cue_type %in% c('context', 'verb')) %>%
+  filter(pos_type %in% c('options', 'masks')) %>%
+  group_by(original_score, cue_type, layer_id, pos_type) %>%
+  tidyboot_mean(effect_ave, nboot = 1)
+
+d %>%
+  filter(original_score) %>%
+  filter(pos_type %in% c('options', 'masks')) %>%
   group_by(pair_id, cue_type, layer_id, pos_type) %>%
   summarize(effect_ave = mean(effect_ave)) %>%
-  #group_by(cue_type, layer_id, pos_type) %>%
-  #tidyboot_mean(effect_ave, nboot = 1) %>%
-  ggplot(aes(x = as.factor(layer_id), y = effect_ave, color = cue_type)) +
-    #geom_point(alpha = 0.05) +
-    geom_boxplot(outlier.shape = NA) +
-    facet_wrap( ~ pos_type) +
-    theme_few() 
+  mutate(cue_type = fct_relevel(cue_type, c('context', 'verb', 'context_verb'))) %>%
+  ggplot(aes(x = as.factor(layer_id), y = effect_ave, color = pos_type, group = pos_type)) +
+    geom_line(alpha = 0.1, aes(group = pair_id)) +
+    geom_line(aes(y = empirical_stat), data = d.mean) +
+    #geom_boxplot(outlier.shape = NA) +
+    facet_grid( ~ cue_type) +
+    theme_few() +
+    theme(aspect.ratio = 1)
 ```
 
 # Statistical analysis
@@ -72,5 +94,70 @@ d %>%
   summarize(p.val = t.test(effect_ave)$p.value) %>%
   mutate(significance_level = case_when(p.val < 0.001 ~ '***', p.val < 0.01 ~ '**', p.val < 0.05 ~ '*', TRUE ~ 'n.s.'))
 ```
+
+
+# 1.3: Z-rep intervention (cumulative)
+
+```{r}
+d.zrep <- read_csv(here('data/combined_effect_ave_z_rep_cascade_multihead.csv')) 
+
+d.zrep %>%
+  filter(original_score) %>%
+  filter(pos_type %in% c('options', 'masks')) %>%
+  group_by(original_score, cue_type, layer_id, pos_type) %>%
+  tidyboot_mean(effect_ave, nboot = 1) %>%
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, 
+             color = pos_type, group = pos_type)) +
+    geom_line() +
+    #geom_boxplot(outlier.shape = NA) +
+    facet_grid( ~ cue_type) +
+    theme_few() +
+    theme(aspect.ratio = 1)
+```
+
+
+# 1.4: fine-grained analyses
+
+```{r}
+d.att <- read_csv(here('data/combined_effect_ave_attention.csv')) 
+d.val <- read_csv(here('data/combined_effect_ave_value.csv')) 
+```
+
+```{r}
+d.val %>%
+  filter(original_score) %>%
+  filter(cue_type == 'context') %>%
+  filter(pos_type %in% c('options', 'masks', 'context')) %>%
+  group_by(original_score, cue_type, head_id, layer_id, pos_type) %>%
+  tidyboot_mean(effect_ave, nboot = 1) %>%
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, 
+             color = pos_type, group = pos_type)) +
+    geom_line() +
+    #geom_boxplot(outlier.shape = NA) +
+    facet_wrap( ~ head_id) +
+    theme_few() +
+    theme(aspect.ratio = 1)
+
+ggsave('val-heads.pdf', units = 'in', width = 10, height = 12)
+```
+
+```{r}
+d.att %>%
+  filter(original_score) %>%
+  filter(cue_type == 'context') %>%
+  group_by(original_score, cue_type, head_id, layer_id, pos_type) %>%
+  tidyboot_mean(effect_ave, nboot = 100) %>%
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, 
+             color = pos_type, group = pos_type)) +
+    geom_line() +
+    geom_hline(yintercept = 0, linetype = 'dotted') +
+    geom_ribbon(aes(ymin = ci_lower, ymax = ci_upper), color = NA, alpha = 0.1) +
+    facet_wrap( ~ head_id) +
+    theme_few() +
+    theme(aspect.ratio = 1)
+
+ggsave('att-heads.pdf', units = 'in', width = 10, height = 12)
+```
+
 
 
