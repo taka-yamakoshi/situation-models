@@ -28,8 +28,8 @@ if __name__ =='__main__':
 
     dataset_name = dataset + f'_{size}' if dataset == 'winogrande' else dataset
 
-    pos_types_singles = ['options','masks'] #['options','context','masks','verb','period','cls-sep','rest']
-    pos_types_q_and_k = ['options-masks','masks-options','context-masks','context-options']
+    pos_types_singles = ['context','verb','options','masks','rest','period','cls-sep'] #['options','context','masks','verb','period','cls-sep','rest']
+    pos_types_q_and_k = ['options-masks','masks-options'] #['options-masks','masks-options','context-masks','context-options']
     cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2'] #['context','verb','context_verb','synonym_1','synonym_2']
     stimuli_list = ['original','control','control','synonym_1','synonym_2'] #['original','control','control','synonym_1','synonym_2']
     mask_context_list = [False,True,False,False,False] #[False,True,False,False,False]
@@ -57,7 +57,7 @@ if __name__ =='__main__':
                     file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                     +f'{pos_type}_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
-                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric])
+                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,'original_1','original_2'])
                     loaded_df = loaded_df.assign(cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
         df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}.csv',index=False)
