@@ -178,6 +178,64 @@ d.qnk <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_q_an
 d.val <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_value.csv'))
 ```
 
+```{r}
+d.attqnk <- bind_rows(d.att,d.qnk)
+d.attqnk <- d.attqnk %>%
+  filter(pos_type%in%c('all','masks-options','options-masks')) %>%
+  mutate(pos_type = replace(pos_type,pos_type=='all','attention')) %>%
+  mutate(pos_type = replace(pos_type,pos_type=="masks-options","query@options\n& key@masks")) %>%
+  mutate(pos_type = replace(pos_type,pos_type=="options-masks","query@masks\n& key@options")) %>%
+  mutate(pos_type=factor(pos_type,levels=c("attention","query@options\n& key@masks","query@masks\n& key@options"))) %>%
+  mutate(rep_type = 'attention')
+```
+
+```{r}
+d.headall <- bind_rows(d.zindiv %>% 
+                        filter(pos_type%in%c('options','masks','rest')) %>%
+                        mutate(pos_type=factor(pos_type,levels=c('options','masks','rest'))) %>%
+                        mutate(rep_type='z'),
+                      d.attqnk,
+                      d.val %>%
+                        filter(pos_type%in%c('context','verb','options','masks','rest')) %>%
+                        mutate(pos_type=factor(pos_type,levels=c('context','verb','options','masks','rest')))
+                        )
+d.headall <- d.headall %>%
+  filter(original_score) %>%
+  mutate(layer_id=layer_id+1) %>%
+  mutate(head_id=head_id+1)
+```
+
+```{r}
+for (plot_head_id in c(8,10,11,15,19,21,26,44,45,48,50,51,53)) {
+for (plot_cue_type in c("context","verb")) {
+d.headall %>%
+    filter(cue_type==plot_cue_type) %>%
+    filter(head_id==plot_head_id) %>%
+    mutate(rep_type=factor(rep_type,levels=c('z','attention','value'))) %>%
+    mutate(pos_type=factor(pos_type,levels=c('context','verb','options','masks','rest',
+                                             'attention','query@options\n& key@masks','query@masks\n& key@options'))) %>%
+  
+    group_by(rep_type,pos_type,layer_id,head_id) %>%
+    #summarize(effect_ave = mean(effect_ave)) %>%
+    tidyboot_mean(effect_ave, nboot = 1000) %>%
+    ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+      geom_hline(yintercept=0) +
+      geom_line(size=1.2,position = position_dodge(width = 0.3)) +
+      geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.8,size=0.8,linetype='solid',position = position_dodge(width = 0.3)) +
+      theme_few() +
+      scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000",
+                                  "#F0E442","#CC79A7","#0072B2")) +
+      #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
+      labs(x = 'Layer', y ='Effect') +
+      guides(color=guide_legend(ncol=5)) +
+      facet_wrap(vars(rep_type)) +
+      theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(),
+            axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+            strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+  ggsave(paste('headwise/all/head_',plot_head_id,'_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 4)
+}}
+```
+
 # 1.4.1: z rep
 ```{r}
 d.zindiv %>% pull(cue_type) %>% unique()
