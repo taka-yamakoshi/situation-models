@@ -297,6 +297,7 @@ d.zindiv %>% pull(cue_type) %>% unique()
 d.zindiv %>% pull(pos_type) %>% unique()
 d.zindiv %>% pull(layer_id) %>% unique()
 d.zindiv %>% pull(head_id) %>% unique()
+d.zindiv %>% filter(cue_type=="verb") %>% pull(pair_id) %>% unique()
 ```
 
 ```{r}
@@ -416,6 +417,115 @@ d.zindiv %>%
     theme_few() +
     facet_wrap(~ pos_type, scales="free") +
   ggsave('zrep_all_scatter_pval.pdf', units = 'in', width = 9, height = 6)
+```
+
+```{r}
+calc_rank_diff <- function(data){
+  data_new <- data %>%
+    group_by(cue_type, layer_id, head_id, pos_type) %>%
+    summarize(p.val = t.test(effect_ave)$p.value,
+              t.val = t.test(effect_ave)$statistic) %>%
+    group_by(cue_type, head_id, pos_type) %>%
+    slice_max(t.val) %>%
+    group_by(cue_type, pos_type) %>%
+    mutate(rank = (min_rank(desc(t.val)))) %>%
+    select(cue_type,head_id,pos_type,rank) %>%
+    pivot_wider(names_from=cue_type,values_from=c("rank")) %>%
+    mutate(rank_diff=context-verb)
+}
+```
+
+```{r}
+resample_data <- function(data){
+  data_new <- bind_rows(data %>% 
+                          filter(cue_type=="context") %>% 
+                          group_by(layer_id, head_id, pos_type) %>%
+                          slice_sample(n=63,replace=T),
+                        data %>% 
+                          filter(cue_type=="verb") %>% 
+                          group_by(layer_id, head_id, pos_type) %>%
+                          slice_sample(n=177,replace=T))
+}
+```
+
+```{r}
+change_col_name <- function(data,boot_id){
+  var_name <- paste("rank_diff_",boot_id)
+  data[[var_name]] <- data %>% select(rank_diff)
+  data
+}
+```
+
+```{r}
+sample <- d.zindiv %>%
+  filter(pos_type %in% c("context","verb","options","masks","rest")) %>%
+  tidyboot(summary_function=mean,
+           statistics_functions = calc_rank_diff,
+           nboot=10)
+```
+
+```{r}
+d.rank <- data.frame()
+for (boot_id in 1:100) {
+  d.rank <- bind_rows(d.rank,
+                      d.zindiv %>%
+                        filter(pos_type %in% c("context","verb","options","masks","rest")) %>%
+                        resample_data %>%
+                        calc_rank_diff %>%
+                        mutate(boot_id=boot_id))
+}
+d.rank %>% write_csv("rank_diff_zindiv.csv")
+```
+
+```{r}
+d.rank <- read_csv("rank_diff_zindiv.csv")
+d.rank %>%
+  group_by(pos_type,head_id) %>%
+  summarize(rank_diff_mean=mean(rank_diff),rank_diff_sd=sd(rank_diff)) %>%
+  mutate(color="0") %>%
+  mutate(color = replace(color,rank_diff_mean-1.96*rank_diff_sd>0,"1")) %>%
+  mutate(color = replace(color,rank_diff_mean+1.96*rank_diff_sd<0,"-1")) %>%
+  ggplot(aes(x=as.factor(head_id),y=rank_diff_mean,color=color)) +
+    geom_point() +
+    geom_hline(yintercept = 0, linetype="dotted") +
+    geom_errorbar(aes(ymin=rank_diff_mean-1.96*rank_diff_sd, ymax=rank_diff_mean+1.96*rank_diff_sd),
+                  width=0.8,size=0.8,linetype='solid') +
+    scale_color_manual(values=c("#E69F00","#000000","#56B4E9")) +
+    theme_few() +
+    facet_wrap(~ pos_type, scales="free", ncol = 1) +
+  ggsave('zrep_all_rank_diff.pdf', units = 'in', width = 12, height = 6)
+```
+
+```{r}
+d.zindiv %>%
+  filter(pos_type %in% c("context","verb","options","masks","rest")) %>%
+  group_by(cue_type, layer_id, head_id, pos_type) %>%
+  summarize(p.val = t.test(effect_ave)$p.value,
+            t.val = t.test(effect_ave)$statistic) %>%
+  group_by(cue_type, head_id, pos_type) %>%
+  slice_max(t.val) %>%
+  group_by(cue_type, pos_type) %>%
+  mutate(rank = (min_rank(desc(t.val)))) %>%
+  select(cue_type,head_id,pos_type,rank) %>%
+  pivot_wider(names_from=cue_type,values_from=c("rank")) %>%
+  mutate(rank_diff=context-verb)
+```
+
+```{r}
+d.zindiv %>%
+    filter(cue_type=="context") %>%
+    group_by(layer_id, head_id, pos_type) %>%
+    summarize(p.val = t.test(effect_ave)$p.value,
+              t.val = t.test(effect_ave)$statistic) %>%
+    mutate(p.log=(-log10(p.val))) %>%
+    group_by(head_id,pos_type) %>%
+    slice_max(p.log) %>%
+    mutate(cut_off=-log10(0.001/12/64)) %>%
+    filter(p.log>cut_off) %>%
+    filter(t.val > 0) %>%
+    #pull(head_id) %>% unique()
+    pull(pos_type) %>% unique()
+    #filter(pos_type=="cls-sep")
 ```
 
 # 1.4.2 Attention/Q&K
