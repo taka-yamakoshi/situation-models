@@ -213,6 +213,7 @@ d.zindiv <- d.zindiv %>%
   mutate(pos_type=factor(pos_type,levels=c('context','verb','options', 'masks', 'rest','period','cls-sep'))) %>%
   mutate(layer_id=layer_id+1) %>%
   mutate(head_id=head_id+1)
+
 d.attqnk <- bind_rows(d.att,d.qnk)
 d.attqnk <- d.attqnk %>%
   filter(original_score) %>%
@@ -523,9 +524,44 @@ d.zindiv %>%
     mutate(cut_off=-log10(0.001/12/64)) %>%
     filter(p.log>cut_off) %>%
     filter(t.val > 0) %>%
-    #pull(head_id) %>% unique()
-    pull(pos_type) %>% unique()
+    pull(head_id) %>% unique()
+    #pull(pos_type) %>% unique()
     #filter(pos_type=="cls-sep")
+
+
+```
+
+grid with heads as columns and layers as rows with heads marked by whether they are causally implicated for verb, context, or both.
+
+```{r}
+tvals.raw <- d.zindiv %>%
+    group_by(layer_id, cue_type, head_id, pos_type) %>%
+    summarize(p.val = t.test(effect_ave)$p.value,
+              t.val = t.test(effect_ave)$statistic) 
+
+tvals.raw %>%
+  mutate(p.log=(-log10(p.val))) %>%
+  mutate(cut_off=-log10(0.01/64/12)) %>%
+  filter(p.log > cut_off) %>%
+  group_by(layer_id, head_id, pos_type) %>%
+  select(layer_id,head_id,pos_type,p.val,cue_type) %>%
+  pivot_wider(names_from = c('cue_type'), values_from = c('p.val')) %>%
+  mutate(combination = case_when(is.na(verb) && !is.na(context)  ~ 'context_only',
+                                    !is.na(verb) && is.na(context) ~ 'verb_only',
+                                    !is.na(verb) && !is.na(context) ~ 'both',
+                                    TRUE ~ 'neither')) %>%
+  mutate(strength = min(-log10(max(verb, context, na.rm = T)) / 5, 1)) %>%
+  filter(combination != 'verb_only') %>%
+  filter(!(pos_type %in% c('period', 'cls-sep', 'context', 'verb'))) %>%
+  #mutate(head_id = fct_reorder(factor(head_id), strength, .desc = T)) %>%
+  ggplot(aes(x = layer_id, y = head_id, fill = combination, color = combination, alpha = strength)) +
+    geom_tile() +
+    facet_grid( ~ pos_type) +
+    #scale_x_reverse(limits = c(12, 0.5)) +
+    scale_fill_colorblind() +
+    scale_color_colorblind() +
+    theme_few() 
+
 ```
 
 # 1.4.2 Attention/Q&K
