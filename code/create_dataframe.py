@@ -93,7 +93,7 @@ if __name__ =='__main__':
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
                                                      cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,'original_1','original_2'])
                     if choose_head_0:
-                        loaded_df = loaded_df.loc[lamba d: d['head_id']==0]
+                        loaded_df = loaded_df.loc[lambda d: d['head_id']==0]
                     loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
         df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv',index=False)
