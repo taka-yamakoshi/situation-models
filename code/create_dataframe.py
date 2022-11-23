@@ -76,6 +76,7 @@ if __name__ =='__main__':
 
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/',exist_ok=True)
     for rep_type in rep_types:
+        print(f'Running {rep_type}\n')
         pos_types,cascade,multihead,cue_type_list,choose_head_0 = set_up_args(rep_type)
         if rep_type.startswith('z_rep'):
             rep_type = 'z_rep'
@@ -96,3 +97,4 @@ if __name__ =='__main__':
                     loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
         df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv',index=False)
+        print('\n\n')
