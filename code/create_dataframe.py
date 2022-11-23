@@ -71,10 +71,11 @@ if __name__ =='__main__':
     dataset = 'combined'
     size = 'xl'
     metric = 'effect_ave'
-    #rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
-    rep_types = ['layer-query-key-value']
-    models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
-                'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
+    rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
+    #rep_types = ['layer-query-key-value']
+    models = ['albert-xxlarge-v2']
+    #models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
+    #'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
     if len(models) == 1:
         model_id = models[0]
     else:
