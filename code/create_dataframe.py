@@ -20,14 +20,20 @@ def loaded_df_preprocess(file_path,show_last_mod=False,show_score=False,cols=Non
     loaded_df = loaded_df[cols]
     return loaded_df
 
-def set_up_args(rep_type):
+def set_up_args(rep_type,model_id):
+    if model_id == 'models':
+        assert rep_type == 'layer-query-key-value'
     if rep_type == 'layer-query-key-value':
-        pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+        if model_id == 'models':
+            pos_types = ['options','context','masks','verb','rest']
+            cue_type_list = ['context']
+        else:
+            pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+            cue_type_list = ['context','verb','context_verb']
         cascade, multihead = False, True
-        cue_type_list = ['context','verb','context_verb']
         choose_head_0 = True
     elif rep_type == 'z_rep_concat':
-        pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+        pos_types = ['options','masks','rest']
         cascade, multihead = True, True
         cue_type_list = ['context','verb','context_verb']
         choose_head_0 = True
@@ -65,8 +71,10 @@ if __name__ =='__main__':
     dataset = 'combined'
     size = 'xl'
     metric = 'effect_ave'
-    rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention']
-    models = ['albert-xxlarge-v2']
+    #rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
+    rep_types = ['layer-query-key-value']
+    models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
+                'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
     if len(models) == 1:
         model_id = models[0]
     else:
@@ -76,8 +84,8 @@ if __name__ =='__main__':
 
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/',exist_ok=True)
     for rep_type in rep_types:
-        print(f'Running {rep_type}\n')
-        pos_types,cascade,multihead,cue_type_list,choose_head_0 = set_up_args(rep_type)
+        print(f'Running {rep_type}')
+        pos_types,cascade,multihead,cue_type_list,choose_head_0 = set_up_args(rep_type,model_id)
         if rep_type.startswith('z_rep'):
             rep_type = 'z_rep'
         df = pd.DataFrame([])
@@ -97,4 +105,4 @@ if __name__ =='__main__':
                     loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
         df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv',index=False)
-        print('\n\n')
+        print('\n')
