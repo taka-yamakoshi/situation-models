@@ -20,44 +20,90 @@ def loaded_df_preprocess(file_path,show_last_mod=False,show_score=False,cols=Non
     loaded_df = loaded_df[cols]
     return loaded_df
 
+def set_up_args(rep_type,model_id):
+    if model_id == 'models':
+        assert rep_type == 'layer-query-key-value'
+    if rep_type == 'layer-query-key-value':
+        if model_id == 'models':
+            pos_types = ['options','context','masks','verb','rest']
+            cue_type_list = ['context']
+        else:
+            pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+            cue_type_list = ['context','verb','context_verb']
+        cascade, multihead = False, True
+        choose_head_0 = True
+    elif rep_type == 'z_rep_concat':
+        pos_types = ['options','masks','rest']
+        cascade, multihead = True, True
+        cue_type_list = ['context','verb','context_verb']
+        choose_head_0 = True
+    elif rep_type in ['z_rep_indiv','query','key','value']:
+        pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+        cascade, multihead = False, False
+        cue_type_list = ['context','verb']
+        choose_head_0 = False
+    elif rep_type == 'q_and_k':
+        pos_types = ['options-masks','masks-options','rest-options','rest-masks','options-rest','masks-rest','context-rest','verb-rest']
+        cascade, multihead = False, False
+        cue_type_list = ['context','verb']
+        choose_head_0 = False
+    elif rep_type == 'attention':
+        pos_types = ['None']
+        cascade, multihead = False, False
+        cue_type_list = ['context','verb']
+        choose_head_0 = False
+    else:
+        raise NotImplementedError()
+    return pos_types,cascade,multihead,cue_type_list,choose_head_0
+
+def convert_cue_type_to_stim(cue_type):
+    if cue_type == 'context':
+        stimuli,mask_context = 'original',False
+    elif cue_type == 'verb':
+        stimuli,mask_context = 'control',True
+    elif cue_type == 'context_verb':
+        stimuli,mask_context = 'control',False
+    else:
+        raise NotImplementedError()
+    return stimuli,mask_context
+
 if __name__ =='__main__':
-    model = 'albert-xxlarge-v2'
     dataset = 'combined'
     size = 'xl'
     metric = 'effect_ave'
+    rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
+    #rep_types = ['layer-query-key-value']
+    models = ['albert-xxlarge-v2']
+    #models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
+    #'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
+    if len(models) == 1:
+        model_id = models[0]
+    else:
+        model_id = 'models'
 
     dataset_name = dataset + f'_{size}' if dataset == 'winogrande' else dataset
 
-    pos_types_singles = ['context','verb','options','masks','rest','period','cls-sep'] #['options','context','masks','verb','period','cls-sep','rest']
-    pos_types_q_and_k = ['options-masks','masks-options'] #['options-masks','masks-options','context-masks','context-options']
-    cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2'] #['context','verb','context_verb','synonym_1','synonym_2']
-    stimuli_list = ['original','control','control','synonym_1','synonym_2'] #['original','control','control','synonym_1','synonym_2']
-    mask_context_list = [False,True,False,False,False] #[False,True,False,False,False]
-    rep_types = ['layer-query-key-value'] #['layer-query-key-value','z_rep','z_rep','value', 'attention','q_and_k']
-    cascade_list = [False] #[False,True,False,False,False,False]
-    multihead_list = [True] #[True,True,False,False,False,False]
-
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/',exist_ok=True)
-    for rep_type,cascade,multihead in zip(rep_types,cascade_list,multihead_list):
+    for rep_type in rep_types:
+        print(f'Running {rep_type}')
+        pos_types,cascade,multihead,cue_type_list,choose_head_0 = set_up_args(rep_type,model_id)
+        if rep_type.startswith('z_rep'):
+            rep_type = 'z_rep'
         df = pd.DataFrame([])
-        cascade_id = '_cascade' if cascade else ''
-        multihead_id = '_multihead' if multihead else ''
-        for stimuli,mask_context,cue_type in zip(stimuli_list,mask_context_list,cue_type_list):
-            mask_context_id = '_mask_context' if mask_context else ''
-            if rep_type=='attention':
-                file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
-                                +f'None_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
-                loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
-                                                 cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric])
-                loaded_df = loaded_df.assign(cue_type=cue_type,pos_type='all',rep_type=f'{rep_type}{cascade_id}{multihead_id}')
-                df = pd.concat([df,loaded_df])
-            else:
-                pos_types = pos_types_q_and_k if rep_type=='q_and_k' else pos_types_singles
+        for model in models:
+            cascade_id = '_cascade' if cascade else ''
+            multihead_id = '_multihead' if multihead else ''
+            for cue_type in cue_type_list:
+                stimuli,mask_context = convert_cue_type_to_stim(cue_type)
+                mask_context_id = '_mask_context' if mask_context else ''
                 for pos_type in pos_types:
                     file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                     +f'{pos_type}_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
                                                      cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,'original_1','original_2'])
-                    loaded_df = loaded_df.assign(cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
+                    if choose_head_0:
+                        loaded_df = loaded_df.loc[lambda d: d['head_id']==0]
+                    loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
-        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}.csv',index=False)
+        df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv',index=False)
+        print('\n')

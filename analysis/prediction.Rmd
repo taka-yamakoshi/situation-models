@@ -1,0 +1,59 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Import dependencies
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(tidyboot)
+```
+
+```{r}
+colorblind_pal()(8)
+```
+"#E69F00","#D55E00","#56B4E9","#009E73","#000000"
+
+# Import data
+
+```{r,message=FALSE}
+d.prediction <- read_csv(here('results/prediction/combined/combined.csv')) %>%
+  separate(cue_type, into = c('cue_type', 'synonym_id'), sep='_', fill='right')
+```
+
+```{r}
+d.prediction %>% 
+  mutate(strict=(ave_1>0)&(ave_2<0),weak=ave_1>ave_2) %>%
+  group_by(model,cue_type) %>% 
+  summarize(strict_acc=mean(strict),weak_acc=mean(weak)) %>%
+  filter(model=='gpt2-large')
+```
+
+# Weaker Metric
+```{r}
+
+```
+
+# Sanity Check
+```{r,message=FALSE}
+d.models.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead_models.csv')) %>%
+  separate(pair_id, into = c('prefix', 'pair_id'))
+d.models.raw %>% pull(head_id) %>% unique()
+d.models.raw %>% pull(cue_type) %>% unique()
+```
+
+```{r}
+d.models <- d.models.raw %>%
+  mutate(layer_id = layer_id+1)
+```
+
+```{r}
+d.models %>% 
+  filter(pos_type=='context') %>%
+  group_by(cue_type,model) %>%
+  summarize(acc=mean(original_score))
+
+```
