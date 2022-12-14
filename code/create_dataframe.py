@@ -29,7 +29,7 @@ def set_up_args(rep_type,model_id):
             cue_type_list = ['context']
         else:
             pos_types = ['options','context','masks','verb','period','cls-sep','rest']
-            cue_type_list = ['context','verb','context_verb']
+            cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2']
         cascade, multihead = False, True
         choose_head_0 = True
     elif rep_type == 'z_rep_concat':
@@ -63,6 +63,10 @@ def convert_cue_type_to_stim(cue_type):
         stimuli,mask_context = 'control',True
     elif cue_type == 'context_verb':
         stimuli,mask_context = 'control',False
+    elif cue_type == 'synonym_1':
+        stimuli,mask_context = 'synonym_1',False
+    elif cue_type == 'synonym_2':
+        stimuli,mask_context = 'synonym_2',False
     else:
         raise NotImplementedError()
     return stimuli,mask_context
