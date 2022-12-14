@@ -11,9 +11,9 @@ def loaded_df_preprocess(file_path,stimuli,show_last_mod=False,show_score=False)
         print(time.ctime(file_stat.st_mtime),file_path)
     loaded_df = pd.read_csv(file_path)
     if stimuli in ['synonym_1','synonym_2']:
-        loaded_df = loaded_df.assign(score=(loaded_df.ave_1>0)&(loaded_df.ave_2>0))
+        loaded_df = loaded_df.assign(score=lambda df:(df.ave_1>0)&(df.ave_2>0))
     else:
-        loaded_df = loaded_df.assign(score=(loaded_df.ave_1>0)&(loaded_df.ave_2<0))
+        loaded_df = loaded_df.assign(score=lambda df:(df.ave_1>0)&(df.ave_2<0))
     if show_score:
         print(f'{np.mean(loaded_df.score)}')
     return loaded_df
