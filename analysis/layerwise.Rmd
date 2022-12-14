@@ -22,7 +22,15 @@ colorblind_pal()(8)
 ```{r,message=FALSE}
 d.layer.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
-d.layer.raw %>% pull(head_id) %>% unique()
+
+# 
+sent_list <- d.layer.raw %>%
+  filter((layer_id==0)&(head_id==0)&(pos_type=='context')) %>%
+  select(c("pair_id","original_score","cue_type")) %>%
+  pivot_wider(names_from="cue_type",values_from="original_score") %>%
+  mutate(group_score=str_c(context,verb,sep="-")) %>%
+  filter(group_score=="TRUE-TRUE") %>%
+  pull("pair_id")
 ```
 
 How many sentences?
@@ -45,9 +53,11 @@ d.layer.raw %>%
 ```
 
 # 1.2: Layer-wise intervention
-# Format the data
+## Format the data
+
 ```{r}
 d.layer <- d.layer.raw %>%
+  filter(pair_id %in% sent_list) %>%
   filter(cue_type %in% c('context','verb','context_verb')) %>%
   filter(pos_type %in% c('context','verb','options', 'masks', 'rest')) %>%
   mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
@@ -56,25 +66,26 @@ d.layer <- d.layer.raw %>%
   mutate(layer_id = layer_id+1)
 ```
 
-# Main plot for correctly predicted cases
+## Main plot for correctly predicted cases
 
 ```{r}
 d.layer %>%
-  filter(original_score) %>%
+  group_by(cue_type, layer_id, pos_type, pair_id) %>%
+  summarize(effect_ave = mean(effect_ave)) %>%
   group_by(cue_type, layer_id, pos_type) %>%
-  #summarize(effect_ave = mean(effect_ave)) %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
-  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, fill = pos_type, color = pos_type, group = pos_type)) +
     geom_line(size=1.2,position = position_dodge(width = 0.4)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.1,size=0.8,linetype='solid',position = position_dodge(width = 0.4)) +
+    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     labs(x = 'Layer', y ='Effect') +
     geom_hline(yintercept=0) +
     facet_wrap(~ cue_type, scales="free_y") +
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
-          strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+          strip.text=element_text(size=16), legend.text=element_text(size=16)) 
 ggsave('layer.pdf', units = 'in', width = 9, height = 4)
 ```
 
@@ -100,7 +111,7 @@ d.layer %>%
 ggsave('layer_split_1_0_2.pdf', units = 'in', width = 9, height = 4)
 ```
 
-# Supp plot for periods and special tokens
+# Supplement plot for periods and special tokens (S)
 
 ```{r}
 d.layer.raw %>%
