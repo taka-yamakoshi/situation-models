@@ -3,6 +3,7 @@ import numpy as np
 import csv
 import argparse
 import os
+import re
 
 import openai
 from dotenv import dotenv_values
@@ -12,7 +13,7 @@ from wsc_utils import load_dataset
 def calc_logprob(initialSequence, continuation):
     response = openai.Completion.create(
             engine      = "text-davinci-003",
-            prompt      = initinitialSequence_seq + " " + continuation,
+            prompt      = initialSequence + " " + continuation,
             max_tokens  = 0,
             temperature = 1,
             logprobs    = 0,
