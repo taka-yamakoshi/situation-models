@@ -1,7 +1,9 @@
-import openai
 import time
 import numpy as np
 import csv
+import argparse
+
+import openai
 from dotenv import dotenv_values
 
 from wsc_utils import load_dataset
