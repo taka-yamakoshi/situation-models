@@ -2,6 +2,7 @@ import time
 import numpy as np
 import csv
 import argparse
+import os
 
 import openai
 from dotenv import dotenv_values
