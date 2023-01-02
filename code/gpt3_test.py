@@ -1,9 +1,10 @@
 import openai
 import time
 import numpy as np
-import pandas as pd
+import csv
 from dotenv import dotenv_values
-from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model
+
+from wsc_utils import load_dataset
 
 def calc_logprob(initialSequence, continuation):
     response = openai.Completion.create(
@@ -54,7 +55,7 @@ if __name__ == '__main__':
 
     # set openAI key in separate .env file w/ content
     # OPENAIKEY = yourkey
-    openai.api_key = dotenv_values('.env')['OPENAIKEY']
+    openai.api_key = dotenv_values('../.env')['OPENAIKEY']
 
     head,text = load_dataset(args)
 
