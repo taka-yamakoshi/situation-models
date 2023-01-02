@@ -76,8 +76,11 @@ if __name__ == '__main__':
             logprobs = {}
             for sent_id in range(2):
                 initialSequence = create_stimuli(head,line,sent_id)
-                logprobs[f'ave_{sent_id+1}'] = calc_logprob(initialSequence,'A')-calc_logprob(initialSequence,'B')
+                logprob_A = calc_logprob(initialSequence,'A')
+                logprob_B = calc_logprob(initialSequence,'B')
+                logprobs[f'ave_{sent_id+1}'] = logprob_A - logprob_B
             writer.writerow(line+[logprobs['ave_1'],logprobs['ave_2']])
+            #time.sleep(10)
 
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
