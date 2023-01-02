@@ -73,6 +73,7 @@ if __name__ == '__main__':
         writer = csv.writer(f)
         writer.writerow(head+['ave_1','ave_2'])
         for line in text:
+            print(line)
             logprobs = {}
             for sent_id in range(2):
                 initialSequence = create_stimuli(head,line,sent_id)
@@ -80,7 +81,7 @@ if __name__ == '__main__':
                 logprob_B = calc_logprob(initialSequence,'B')
                 logprobs[f'ave_{sent_id+1}'] = logprob_A - logprob_B
             writer.writerow(line+[logprobs['ave_1'],logprobs['ave_2']])
-            #time.sleep(10)
+            time.sleep(30)
 
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
