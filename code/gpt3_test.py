@@ -11,14 +11,22 @@ from dotenv import dotenv_values
 from wsc_utils import load_dataset
 
 def calc_logprob(initialSequence, continuation):
-    response = openai.Completion.create(
-            engine      = "text-davinci-003",
-            prompt      = initialSequence + " " + continuation,
-            max_tokens  = 0,
-            temperature = 1,
-            logprobs    = 0,
-            echo        = True
-        )
+    pass_flag = False
+    num_fails = 0
+    while not pass_flag and num_fails<3:
+        try:
+            response = openai.Completion.create(
+                engine      = "text-davinci-003",
+                prompt      = initialSequence + " " + continuation,
+                max_tokens  = 0,
+                temperature = 1,
+                logprobs    = 0,
+                echo        = True
+                )
+            pass_flag = True
+        except:
+            time.sleep(30)
+            num_fails += 1
 
     text_offsets = response.choices[0]['logprobs']['text_offset']
     cutIndex = text_offsets.index(max(i for i in text_offsets if i < len(initialSequence))) + 1
@@ -81,7 +89,6 @@ if __name__ == '__main__':
                 logprob_B = calc_logprob(initialSequence,'B')
                 logprobs[f'ave_{sent_id+1}'] = logprob_A - logprob_B
             writer.writerow(line+[logprobs['ave_1'],logprobs['ave_2']])
-            time.sleep(30)
 
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
