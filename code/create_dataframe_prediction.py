@@ -24,7 +24,7 @@ if __name__ =='__main__':
 
     dataset_name = dataset + f'_{size}' if dataset == 'winogrande' else dataset
     model_list = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
-                    'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2','gpt2','gpt2-large']
+                    'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2','gpt2','gpt2-large','gpt3']
     stimuli_list = ['original','control','control','synonym_1','synonym_2']
     mask_context_list = [False,True,False,False,False]
     cue_type_list = ['context','verb','context+verb','synonym_1','synonym_2']
