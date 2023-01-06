@@ -13,7 +13,7 @@ from wsc_utils import load_dataset
 def calc_logprob(initialSequence, continuation):
     pass_flag = False
     num_fails = 0
-    while not pass_flag and num_fails<3:
+    while not pass_flag and num_fails<5:
         try:
             response = openai.Completion.create(
                 engine      = "text-davinci-003",
