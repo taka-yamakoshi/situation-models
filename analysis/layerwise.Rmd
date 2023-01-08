@@ -23,7 +23,6 @@ colorblind_pal()(8)
 d.layer.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
 
-# 
 sent_list <- d.layer.raw %>%
   filter((layer_id==0)&(head_id==0)&(pos_type=='context')) %>%
   select(c("pair_id","original_score","cue_type")) %>%
@@ -41,7 +40,7 @@ d.layer.raw %>% pull(pair_id) %>% unique()
 d.layer.raw %>% pull(pos_type) %>% unique()
 ```
 
-# 1.1: Performance
+# 1.1: Report performance
 
 ```{r}
 d.layer.raw %>%
@@ -52,7 +51,8 @@ d.layer.raw %>%
   summarize(n = sum(acc))
 ```
 
-# 1.2: Layer-wise intervention
+# 4.1: Layer-wise intervention
+
 ## Format the data
 
 ```{r}
@@ -74,22 +74,43 @@ d.layer %>%
   summarize(effect_ave = mean(effect_ave)) %>%
   group_by(cue_type, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
-  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, fill = pos_type, color = pos_type, group = pos_type)) +
+  ggplot(aes(x = layer_id, y = empirical_stat, fill = pos_type, color = pos_type, group = pos_type)) +
     geom_line(size=1.2,position = position_dodge(width = 0.4)) +
     geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    labs(x = 'Layer', y ='Effect') +
+    scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
+    labs(x = 'Layer', y ='Effect of intervention') +
     geom_hline(yintercept=0) +
     facet_wrap(~ cue_type, scales="free_y") +
-    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
-          axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+    theme(aspect.ratio = 2,legend.position = 'top', legend.title = element_blank(), 
+          axis.text.x=element_text(size=16),axis.text.y=element_text(size=16), axis.title=element_text(size=18),
           strip.text=element_text(size=16), legend.text=element_text(size=16)) 
-ggsave('layer.pdf', units = 'in', width = 9, height = 4)
+ggsave('layer.pdf', units = 'in', width = 5, height = 4)
 ```
 
-# Supp plot for incorrectly predicted cases
+## Run stats
+
+```{r}
+d.stats <- d.layer %>%
+  group_by(cue_type, layer_id, pos_type, pair_id) %>%
+  summarize(effect_ave = mean(effect_ave, na.rm = F)) %>% 
+  pivot_wider(names_from = pos_type, values_from = effect_ave) %>%
+  group_by(layer_id, cue_type) %>%
+  summarize(options_p.val = t.test(options)$p.value,
+            options_df = t.test(options)$parameter,
+            options_stat = t.test(options)$statistic,
+            mask_option_diff_p.val = t.test(masks, options, paired = T)$p.value,
+            mask_option_diff_stat = t.test(masks, options, paired = T)$statistic) 
+
+d.stats %>% filter(cue_type == 'context')# %>% filter(mask_option_diff_p.val < 0.05/60)
+d.stats %>% filter(cue_type == 'verb')
+d.stats %>% filter(cue_type == 'context+verb')
+
+```
+
+## Supp plot for incorrectly predicted cases (S1)
 
 ```{r}
 d.layer %>%
@@ -107,11 +128,12 @@ d.layer %>%
     facet_wrap(~ cue_type, scales="free_y") +
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
-          strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+          strip.text=element_text(size=16), legend.text=element_text(size=16)) 
+
 ggsave('layer_split_1_0_2.pdf', units = 'in', width = 9, height = 4)
 ```
 
-# Supplement plot for periods and special tokens (S)
+## Supplemental plot for periods and special tokens (S5)
 
 ```{r}
 d.layer.raw %>%
@@ -138,31 +160,21 @@ d.layer.raw %>%
 ggsave('layer_period_cls-sep.pdf', units = 'in', width = 9, height = 4)
 ```
 
-# 1.3: Z-rep intervention (cumulative)
+## Supplemental Figure S4 (cumulative intervention on attention outputs)
+
+In principle, this should be similar to intervening at the residual stream at layer i. 
 
 ```{r,message=FALSE}
 d.zrep.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_z_rep_cascade_multihead_albert-xxlarge-v2.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
-d.zrep.raw %>% pull(head_id) %>% unique()
-```
 
-```{r}
-d.zrep.raw %>% pull(cue_type) %>% unique()
-d.zrep.raw %>% pull(pos_type) %>% unique()
-```
-
-# Format the data
-
-```{r}
 d.zrep <- d.zrep.raw %>%
   filter(pos_type %in% c('options', 'masks','rest')) %>%
   mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
   mutate(cue_type=factor(cue_type,levels=c('context','verb','context+verb'))) %>%
   mutate(pos_type=factor(pos_type,levels=c('options','masks','rest'))) %>%
   mutate(layer_id = layer_id+1)
-```
 
-```{r}
 d.zrep %>%
   filter(original_score) %>%
   group_by(cue_type, layer_id, pos_type) %>%
@@ -178,33 +190,24 @@ d.zrep %>%
     facet_wrap( ~ cue_type, scales="free_y") +
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
-          strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+          strip.text=element_text(size=16), legend.text=element_text(size=16)) 
+  
 ggsave('zrep.pdf', units = 'in', width = 6, height = 4)
 ```
 
-# 1.2.1 Model comparison
+# Supplemental figure S2 (same figure for other models)
 
 ```{r,message=FALSE}
 d.models.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead_models.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
-d.models.raw %>% pull(head_id) %>% unique()
-```
 
-```{r}
-d.models.raw %>% pull(cue_type) %>% unique()
-d.models.raw %>% pull(pos_type) %>% unique()
-```
-
-```{r}
 d.models <- d.models.raw %>%
   filter(pos_type %in% c('context','verb','options', 'masks', 'rest')) %>%
   mutate(pos_type=factor(pos_type,levels=c('context','verb','options','masks','rest'))) %>%
   mutate(model=factor(model,levels=c('bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
                                      'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2'))) %>%
   mutate(layer_id = layer_id+1)
-```
 
-```{r}
 d.models %>%
   filter(original_score) %>%
   group_by(model, layer_id, pos_type) %>%
@@ -220,6 +223,7 @@ d.models %>%
     facet_wrap( ~ model, scales="free") +
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
-          strip.text=element_text(size=16), legend.text=element_text(size=16)) +
+          strip.text=element_text(size=16), legend.text=element_text(size=16)) 
+
 ggsave('layer_models.pdf', units = 'in', width = 9, height = 10)
 ```
