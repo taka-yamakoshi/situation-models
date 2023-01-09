@@ -14,7 +14,7 @@ def calc_logprob_gpt(initialSequence, continuation, args):
     if args.model.startswith('gpt2'):
         model, tokenizer, mask_id, args = load_model(args)
         input_ids = tokenizer(initialSequence+" "+continuation,return_tensors='pt').input_ids
-        assert tokenizer.decode(input_ids[0][-1])==continuation
+        assert tokenizer.decode(input_ids[0][-1]).strip()==continuation
         assert tokenizer.decode(input_ids[0][-2])==initialSequence[-1]
         with torch.no_grad():
             outputs = model(input_ids.to(args.device), return_dict=True)
@@ -51,13 +51,23 @@ def calc_logprob_gpt(initialSequence, continuation, args):
         return np.mean(answerTokenLogProbs)
 
 def create_stimuli(head,line,sent_id):
+    setUp = 'Situation: Sally went to the movies and Bob stayed home.\n'\
+            +'Question: Which of them went to the movies, (A) Sally or (B) Bob?\n'\
+            +'Answer: A\n\n'
+
     sent = line[head.index(f'sent_{sent_id+1}')]
-    assert len([_ for _ in re.finditer('_',sent)])==1
-    question = sent[sent.index('_'):].replace('_','Which')[:-1]+'?\n'
+    pron_new = line[head.index(f'pron_{sent_id+1}_new')]
+    pron_replacement = line[head.index(f'pron_{sent_id+1}_replacement')]
     option_1 = line[head.index('option_1')]
     option_2 = line[head.index('option_2')]
-    options = f'A: {option_1}\nB: {option_2}\n'
-    initialSequence = sent+'\n'+question+options+'Answer:'
+
+    assert len([_ for _ in re.finditer('_',sent)])==1
+    assert len([_ for _ in re.finditer(pron_new,sent)])==1
+
+    sent_new = sent.replace(pron_new,pron_replacement)
+    question = 'Which of them '+sent[sent.index('_')+2:][:-1]+', '
+    options = f'(A) {option_1} or (B) {option_2}?\n'
+    initialSequence = setUp+'Situation: '+sent_new+'\n'+'Question: '+question+options+'Answer:'
     return initialSequence
 
 if __name__ == '__main__':
