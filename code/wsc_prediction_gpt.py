@@ -80,6 +80,7 @@ if __name__ == '__main__':
                         #'original_verb','control_combined','control_combined_verb','synonym_verb'],
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
+    parser.add_argument('--core_id', type = int, default=0)
     parser.add_argument('--mask_context',dest='mask_context',action='store_true')
     parser.add_argument('--no_mask',dest='no_mask',action='store_true')
     parser.set_defaults(mask_context=False,no_mask=False)
