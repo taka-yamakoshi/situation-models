@@ -8,35 +8,47 @@ import re
 import openai
 from dotenv import dotenv_values
 
-from wsc_utils import load_dataset
+from wsc_utils import load_dataset, load_model
 
-def calc_logprob(initialSequence, continuation):
-    pass_flag = False
-    num_fails = 0
-    while not pass_flag and num_fails<5:
-        try:
-            response = openai.Completion.create(
-                engine      = "text-davinci-003",
-                prompt      = initialSequence + " " + continuation,
-                max_tokens  = 0,
-                temperature = 1,
-                logprobs    = 0,
-                echo        = True
-                )
-            pass_flag = True
-        except:
-            time.sleep(30)
-            num_fails += 1
+def calc_logprob_gpt(initialSequence, continuation, args):
+    if args.model.startswith('gpt2'):
+        model, tokenizer, mask_id, args = load_model(args)
+        input_ids = tokenizer(initialSequence+" "+continuation,return_tensors='pt').input_ids
+        assert tokenizer.decode(input_ids[0][-1])==continuation
+        assert tokenizer.decode(input_ids[0][-2])==initialSequence[-1]
+        with torch.no_grad():
+            outputs = model(input_ids.to(args.device), return_dict=True)
+        log_probs = F.log_softmax(outputs.logits.to('cpu'), dim = -1)
+        assert log_probs.shape[0]==1
+        return log_probs[0][-2][input_ids[0][-1].item()]
+    else:
+        assert args.model=='gpt3'
+        pass_flag = False
+        num_fails = 0
+        while not pass_flag and num_fails<5:
+            try:
+                response = openai.Completion.create(
+                    engine      = "text-davinci-003",
+                    prompt      = initialSequence + " " + continuation,
+                    max_tokens  = 0,
+                    temperature = 1,
+                    logprobs    = 0,
+                    echo        = True
+                    )
+                pass_flag = True
+            except:
+                time.sleep(30)
+                num_fails += 1
 
-    text_offsets = response.choices[0]['logprobs']['text_offset']
-    cutIndex = text_offsets.index(max(i for i in text_offsets if i < len(initialSequence))) + 1
-    endIndex = response.usage.total_tokens
-    answerTokens = response.choices[0]["logprobs"]["tokens"][cutIndex:endIndex]
-    answerTokenLogProbs = response.choices[0]["logprobs"]["token_logprobs"][cutIndex:endIndex]
+        text_offsets = response.choices[0]['logprobs']['text_offset']
+        cutIndex = text_offsets.index(max(i for i in text_offsets if i < len(initialSequence))) + 1
+        endIndex = response.usage.total_tokens
+        answerTokens = response.choices[0]["logprobs"]["tokens"][cutIndex:endIndex]
+        answerTokenLogProbs = response.choices[0]["logprobs"]["token_logprobs"][cutIndex:endIndex]
 
-    assert len(answerTokens)==1 and answerTokens[0]==" "+continuation
-    assert len(answerTokenLogProbs)==1
-    return np.mean(answerTokenLogProbs)
+        assert len(answerTokens)==1 and answerTokens[0]==" "+continuation
+        assert len(answerTokenLogProbs)==1
+        return np.mean(answerTokenLogProbs)
 
 def create_stimuli(head,line,sent_id):
     sent = line[head.index(f'sent_{sent_id+1}')]
@@ -63,11 +75,11 @@ if __name__ == '__main__':
     parser.set_defaults(mask_context=False,no_mask=False)
     args = parser.parse_args()
     print(f'running with {args}')
-    assert args.model=='gpt3'
 
-    # set openAI key in separate .env file w/ content
-    # OPENAIKEY = yourkey
-    openai.api_key = dotenv_values('../.env')['OPENAIKEY']
+    if args.model=='gpt3':
+        # set openAI key in separate .env file w/ content
+        # OPENAIKEY = yourkey
+        openai.api_key = dotenv_values('../.env')['OPENAIKEY']
 
     head,text = load_dataset(args)
 
@@ -85,8 +97,8 @@ if __name__ == '__main__':
             logprobs = {}
             for sent_id in range(2):
                 initialSequence = create_stimuli(head,line,sent_id)
-                logprob_A = calc_logprob(initialSequence,'A')
-                logprob_B = calc_logprob(initialSequence,'B')
+                logprob_A = calc_logprob_gpt(initialSequence,'A',args)
+                logprob_B = calc_logprob_gpt(initialSequence,'B',args)
                 logprobs[f'ave_{sent_id+1}'] = logprob_A - logprob_B
             writer.writerow(line+[logprobs['ave_1'],logprobs['ave_2']])
 
