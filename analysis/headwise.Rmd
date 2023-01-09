@@ -22,12 +22,10 @@ colorblind_pal()(8)
 # fine-grained analyses
 
 ```{r,message=FALSE}
-d.zindiv.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_z_rep_albert-xxlarge-v2.csv'))
-d.qry.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_query_albert-xxlarge-v2.csv'))
-d.key.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_key_albert-xxlarge-v2.csv'))
-d.val.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_value_albert-xxlarge-v2.csv'))
-#d.att <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_attention_albert-xxlarge-v2.csv'))
-#d.qnk <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_q_and_k_albert-xxlarge-v2.csv'))
+d.zindiv.raw <- read_csv(here('results/combined_effect_ave_z_rep_albert-xxlarge-v2.csv'))
+d.qry.raw <- read_csv(here('results/combined_effect_ave_query_albert-xxlarge-v2.csv'))
+d.key.raw <- read_csv(here('results/combined_effect_ave_key_albert-xxlarge-v2.csv'))
+d.val.raw <- read_csv(here('results/combined_effect_ave_value_albert-xxlarge-v2.csv'))
 ```
 
 ```{r}
@@ -42,72 +40,30 @@ sent_list <- d.zindiv.raw %>%
 ```
 
 ```{r}
-d.zindiv <- d.zindiv.raw %>%
-  separate(pair_id, into = c('prefix', 'pair_id')) %>%
-  filter(pair_id %in% sent_list) %>%
-  mutate(layer_id=layer_id+1) %>%
-  mutate(head_id=head_id+1)
-
-d.qry <- d.qry.raw %>%
-  separate(pair_id, into = c('prefix', 'pair_id')) %>%
-  filter(pair_id %in% sent_list) %>%
-  mutate(layer_id=layer_id+1) %>%
-  mutate(head_id=head_id+1)
-
-d.key <- d.key.raw %>%
-  separate(pair_id, into = c('prefix', 'pair_id')) %>%
-  filter(pair_id %in% sent_list) %>%
-  mutate(layer_id=layer_id+1) %>%
-  mutate(head_id=head_id+1)
-
-d.val <- d.val.raw %>%
-  separate(pair_id, into = c('prefix', 'pair_id')) %>%
-  filter(pair_id %in% sent_list) %>%
-  mutate(layer_id=layer_id+1) %>%
-  mutate(head_id=head_id+1)
-
-#d.attqnk <- bind_rows(d.att,d.qnk) %>%
-#  filter(original_score) %>%
-#  filter(pos_type%in%c('all','masks-options','options-masks','rest-options','rest-masks',
-#                       'options-rest','masks-rest','context-rest','verb-rest')) %>%
-#  mutate(pos_type = replace(pos_type,pos_type=='all','attention')) %>%
-  #mutate(pos_type = replace(pos_type,pos_type=="masks-options","query@options\n& key@masks")) %>%
-  #mutate(pos_type = replace(pos_type,pos_type=="options-masks","query@masks\n& key@options")) %>%
-  #mutate(pos_type=factor(pos_type,levels=c('attention','masks-options','options-masks','rest-options','rest-masks',
-  #                                         'options-rest','masks-rest','context-rest','verb-rest'))) %>%
-#  mutate(layer_id=layer_id+1) %>%
-#  mutate(head_id=head_id+1)
-
-```
-
-```{r}
-d.zindiv %>% pull(cue_type) %>% unique()
-d.zindiv %>% pull(pos_type) %>% unique()
-d.qry %>% pull(cue_type) %>% unique()
-d.qry %>% pull(pos_type) %>% unique()
-d.key %>% pull(cue_type) %>% unique()
-d.key %>% pull(pos_type) %>% unique()
-d.val %>% pull(cue_type) %>% unique()
-d.val %>% pull(pos_type) %>% unique()
-#d.att %>% pull(cue_type) %>% unique()
-#d.att %>% pull(pos_type) %>% unique()
-#d.qnk %>% pull(cue_type) %>% unique()
-#d.qnk %>% pull(pos_type) %>% unique()
-#d.attqnk %>% pull(cue_type) %>% unique()
-#d.attqnk %>% pull(pos_type) %>% unique()
+preprocess <- function(d) {
+  d %>%
+    separate(pair_id, into = c('prefix', 'pair_id')) %>%
+    filter(pair_id %in% sent_list) %>%
+    mutate(layer_id=layer_id+1) %>%
+    mutate(head_id=head_id+1) %>%
+    return()
+}
+d.zindiv <- preprocess(d.zindiv.raw)
+d.qry <- preprocess(d.qry.raw)
+d.key <- preprocess(d.key.raw)
+d.val <- preprocess(d.val.raw)
 ```
 
 # See how many heads are involved in this circuit
+
 ```{r}
-p_threshold <- 0.05
+p_threshold <- 0.001
 head_list <- d.zindiv %>%
   filter(cue_type=="context") %>%
   group_by(layer_id, head_id, pos_type) %>%
   summarize(p.val = t.test(effect_ave)$p.value,
             t.val = t.test(effect_ave)$statistic) %>%
-  mutate(p.log=(-log10(p.val))) %>%
-  mutate(cut_off=-log10(p_threshold/12/64/7/2)) %>%
-  filter(p.log>cut_off) %>%
+  filter(p.val < p_threshold/12/64/7/2) %>%
   pull(head_id) %>% unique()
 length(head_list)
 ```
@@ -131,7 +87,10 @@ d.headall <- bind_rows(d.zindiv %>%
 d.headall %>% head()
 ```
 
-# Bootstrap (takes time)
+# Bootstrap 
+
+takes a while when nboot is big
+
 ```{r}
 d.head_all.boot <- d.headall %>%
   group_by(cue_type,layer_id,head_id,rep_type,pos_type) %>%
@@ -142,17 +101,48 @@ write.csv(d.head_all.boot,file="headall_boot.csv",row.names=FALSE)
 
 ```{r}
 d.head_all.boot <- read_csv("headall_boot.csv")
-d.head_all.boot %>% head()
 ```
 
 ```{r}
-#p_threshold <- 0.001
-bar_center <- -0.01
-bar_height <- 0.015
 t.vals.all <- d.headall %>%
+  filter(cue_type == 'context') %>%
   group_by(cue_type, layer_id, head_id, rep_type, pos_type) %>%
   summarize(p.val = t.test(effect_ave)$p.value,
-            t.val = t.test(effect_ave)$statistic) %>%
+            t.val = t.test(effect_ave)$statistic)
+
+# Head 11
+t.vals.all %>%
+  filter(p.val < 0.0001) %>%
+  filter(head_id %in% c(11), layer_id < 9) 
+ 
+# Head 8
+t.vals.all %>%
+  filter(p.val < 0.000001) %>%
+  filter(head_id %in% c(8), layer_id %in% c(9, 10))
+   
+# Head 45
+t.vals.all %>%
+  filter(p.val < 0.000001) %>%
+  filter(head_id %in% c(45))
+
+# Head 53
+t.vals.all %>%
+  filter(p.val < 0.000001) %>%
+  filter(head_id %in% c(53))
+
+# Head 60
+t.vals.all %>%
+  filter(p.val < 0.000001) %>%
+  filter(head_id %in% c(60))
+
+```
+
+## Make plots
+
+```{r}
+bar_center <- -0.01
+bar_height <- 0.015
+t.vals.all %>%
   mutate(p.log=(-log10(p.val))) %>%
   mutate(y = 0) %>%
   mutate(y = replace(y,pos_type==pos_type_list[1],bar_center-4*bar_height)) %>%
@@ -185,49 +175,46 @@ d.headall.plot <- bind_rows(d.head_all.boot %>%
 ```{r}
 for (plot_head_id in 1:64) {
 #for (plot_head_id in c(3,8,11,16,17,21,23,24,26,28,29,35,37,40,42,45,46,48,50,51,53,55,56,58,60)) {
-for (plot_cue_type in c("context","verb")) {
-d.head <- d.headall.plot %>% 
-  filter(cue_type==plot_cue_type) %>%
-  filter(head_id==plot_head_id) %>%
-  #mutate(rep_type=factor(rep_type,levels=c('transformation','query','key','value'))) %>%
-  mutate(rep_type=factor(rep_type,levels=c('transformation','key','value'))) %>%
-  mutate(plot_type=factor(plot_type,levels=c('tile','line'))) %>%
-  mutate(pos_type=factor(pos_type,levels=pos_type_list))
-
-d.head %>%
-  ggplot(aes(x=as.factor(layer_id), y=y, group=pos_type)) +
-  geom_hline(yintercept=0) +
-  geom_tile(data = subset(d.head, plot_type == 'tile'),
-            height=bar_height,width=1,
-            #aes(alpha=alpha,color="white",fill=pos_type)) +
-            aes(alpha=alpha,fill=pos_type)) +
-  geom_line(data = subset(d.head, plot_type == 'line'),
-            aes(color=pos_type),
-            linewidth=1.2,position=position_dodge(width=0.5)) +
-  geom_errorbar(data = subset(d.head, plot_type == 'line'),
-                aes(ymin=ci_lower, ymax=ci_upper, color=pos_type), 
-                width=0.8,size=0.8,linetype='solid',position=position_dodge(width=0.5)) +
-  theme_few() +
-  scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-  scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-  scale_alpha(limits = c(0.0, 1.0)) +
-  ylim(-0.08,NA) + 
-  labs(x = 'Layer', y ='Effect') +
-  guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
-  facet_grid(plot_type~rep_type,scales = "free_y") +
-  force_panelsizes(rows = c(unit(0.6,"in"), unit(3.0,"in")),
-                   cols = c(unit(2.5,"in"),unit(2.5,"in"), unit(2.5,"in"))) +
-  theme(legend.position = 'top', legend.title = element_blank(), legend.box="vertical",
-        axis.text.x=element_text(size=10), axis.text.y=element_text(size=14), axis.title=element_text(size=18),
-        strip.text.x=element_text(size=16), legend.text=element_text(size=16), strip.text.y=element_blank(),
-        axis.line = element_line(colour = "black"),
-        panel.border = element_blank(),panel.background = element_blank())
-#library(grid)
-#library(gtable)
-#gt = ggplot_gtable(ggplot_build(g))
-#gtable_show_layout(gt)
-ggsave(paste('headwise/all/alpha/head_',plot_head_id,'_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 7.5, height = 3.6)
-}}
+  for (plot_cue_type in c("context","verb")) {
+    d.head <- d.headall.plot %>% 
+      filter(cue_type==plot_cue_type) %>%
+      filter(head_id==plot_head_id) %>%
+      #mutate(rep_type=factor(rep_type,levels=c('transformation','query','key','value'))) %>%
+      mutate(rep_type=factor(rep_type,levels=c('transformation','key','value'))) %>%
+      mutate(plot_type=factor(plot_type,levels=c('tile','line'))) %>%
+      mutate(pos_type=factor(pos_type,levels=pos_type_list))
+    
+    d.head %>%
+      ggplot(aes(x=as.factor(layer_id), y=y, group=pos_type)) +
+      geom_hline(yintercept=0) +
+      geom_tile(data = subset(d.head, plot_type == 'tile'),
+                height=bar_height,width=1,
+                #aes(alpha=alpha,color="white",fill=pos_type)) +
+                aes(alpha=alpha,fill=pos_type)) +
+      geom_line(data = subset(d.head, plot_type == 'line'),
+                aes(color=pos_type),
+                linewidth=1.2,position=position_dodge(width=0.5)) +
+      geom_errorbar(data = subset(d.head, plot_type == 'line'),
+                    aes(ymin=ci_lower, ymax=ci_upper, color=pos_type), 
+                    width=0.8,size=0.8,linetype='solid',position=position_dodge(width=0.5)) +
+      theme_few() +
+      scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      scale_alpha(limits = c(0.0, 1.0)) +
+      ylim(-0.08,NA) + 
+      labs(x = 'Layer', y ='Effect') +
+      guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
+      facet_grid(plot_type~rep_type,scales = "free_y") +
+      force_panelsizes(rows = c(unit(0.6,"in"), unit(3.0,"in")),
+                       cols = c(unit(2.5,"in"),unit(2.5,"in"), unit(2.5,"in"))) +
+      theme(legend.position = 'top', legend.title = element_blank(), legend.box="vertical",
+            axis.text.x=element_text(size=10), axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+            strip.text.x=element_text(size=16), legend.text=element_text(size=16), strip.text.y=element_blank(),
+            axis.line = element_line(colour = "black"),
+            panel.border = element_blank(),panel.background = element_blank())
+    ggsave(here(paste0('results/figures/headwise/all/alpha/head_',plot_head_id,'_',plot_cue_type,'.pdf',sep="")), units = 'in', width = 7.5, height = 3.6)
+  }
+}
 ```
 
 ```{r}
@@ -247,13 +234,6 @@ d.head_all.boot %>% filter((cue_type==show_cue_type)&(head_id==show_head_id)&(po
 ```
 
 # 1.4.1: z rep
-```{r}
-d.zindiv %>% pull(cue_type) %>% unique()
-d.zindiv %>% pull(pos_type) %>% unique()
-d.zindiv %>% pull(layer_id) %>% unique()
-d.zindiv %>% pull(head_id) %>% unique()
-d.zindiv %>% filter(cue_type=="verb") %>% pull(pair_id) %>% unique()
-```
 
 ```{r}
 pos_type_list <- c('context','verb','options','masks','rest')
