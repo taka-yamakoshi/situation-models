@@ -54,7 +54,7 @@ d.key <- preprocess(d.key.raw)
 d.val <- preprocess(d.val.raw)
 ```
 
-# See how many heads are involved in this circuit
+# Count how many heads are involved in this circuit
 
 ```{r}
 p_threshold <- 0.001
@@ -68,15 +68,14 @@ head_list <- d.zindiv %>%
 length(head_list)
 ```
 
+
+
 ```{r}
 pos_type_list <- c('context','verb','options','masks','rest')
 d.headall <- bind_rows(d.zindiv %>% 
                         filter(pos_type%in%pos_type_list) %>%
                         mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
                         mutate(rep_type='transformation'),
-                       #d.qry %>%
-                       #filter(pos_type%in%pos_type_list) %>%
-                       #mutate(pos_type=factor(pos_type,levels=pos_type_list)),
                        d.key %>%
                          filter(pos_type%in%pos_type_list) %>%
                          mutate(pos_type=factor(pos_type,levels=pos_type_list)),
@@ -89,7 +88,7 @@ d.headall %>% head()
 
 # Bootstrap 
 
-takes a while when nboot is big
+can take a while when nboot is big
 
 ```{r}
 d.head_all.boot <- d.headall %>%
@@ -97,11 +96,10 @@ d.head_all.boot <- d.headall %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
   rename(y=empirical_stat)
 write.csv(d.head_all.boot,file="headall_boot.csv",row.names=FALSE)
+#d.head_all.boot <- read_csv("headall_boot.csv")
 ```
 
-```{r}
-d.head_all.boot <- read_csv("headall_boot.csv")
-```
+Examine effects at specific heads
 
 ```{r}
 t.vals.all <- d.headall %>%
@@ -112,8 +110,8 @@ t.vals.all <- d.headall %>%
 
 # Head 11
 t.vals.all %>%
-  filter(p.val < 0.0001) %>%
-  filter(head_id %in% c(11), layer_id < 9) 
+  filter(p.val < 0.000001) %>%
+  filter(head_id %in% c(11)) 
  
 # Head 8
 t.vals.all %>%
@@ -134,8 +132,64 @@ t.vals.all %>%
 t.vals.all %>%
   filter(p.val < 0.000001) %>%
   filter(head_id %in% c(60))
+```
+
+
+
+# Comparing verb vs context
+
+grid with heads as columns and layers as rows with heads marked by whether they are causally implicated for verb, context, or both.
+
+```{r}
+tvals.raw <- d.zindiv %>%
+    group_by(layer_id, cue_type, head_id, pos_type) %>%
+    summarize(p.val = t.test(effect_ave)$p.value,
+              t.val = t.test(effect_ave)$statistic,
+              effect = mean(effect_ave)) 
+
+threshold <- 0.005/64/12/3    
+tvals.clean <- tvals.raw %>%
+  select(layer_id,head_id,pos_type,p.val,cue_type, effect) %>%
+  pivot_wider(names_from = c('cue_type'), values_from = c('p.val', 'effect')) %>%
+  ungroup() %>%
+  mutate(combination = case_when(p.val_verb > threshold & p.val_context <= threshold  ~ 'context_only',
+                                    p.val_verb <= threshold & p.val_context > threshold ~ 'syntax_only',
+                                    p.val_verb <= threshold & p.val_context <= threshold ~ 'both',
+                                    TRUE ~ 'neither')) 
+  
+first_context_layer <- tvals.clean %>%
+  filter(combination == 'context_only') %>%
+  filter(!(pos_type %in% c('period', 'cls-sep', 'context', 'verb'))) %>%
+  group_by(head_id, pos_type) %>%
+  summarize(layer_of_first_context = min(layer_id)) %>%
+  ungroup() %>%
+  complete(head_id, pos_type, fill = list(layer_of_first_context = 13)) 
+  
+tvals.clean %>%
+  left_join(first_context_layer) %>%
+  filter(!(pos_type %in% c('period', 'cls-sep', 'context', 'verb'))) %>%
+  filter(combination %in% c('context_only', 'both', 'syntax_only')) %>%
+  replace_na(list(layer_of_first_context = 13)) %>%
+  ungroup() %>%
+  mutate(head_id = as.factor(head_id),
+         head_id = fct_reorder(head_id, layer_of_first_context, .fun = mean, .desc = T),
+         pos_type = fct_relevel(pos_type, 'rest')) %>%
+  # rowwise() %>%
+  # mutate(effect_diff = min(0.1, max(-0.1, effect_context - effect_verb)),
+  #        min_p.val = 1 - min(p.val_context, p.val_verb)) %>%
+  filter(layer_id > 6) %>%
+  group_by(head_id) %>%
+  filter(any(combination != 'both')) %>%
+  ggplot(aes(x = layer_id, y = head_id, fill = combination)) +
+    geom_tile(size = .5) +
+    facet_grid( ~ pos_type) +
+    scale_fill_colorblind() +
+    theme_few() 
+
+ggsave('head-specificity.pdf', units = 'in', width = 5, height = 6)
 
 ```
+
 
 ## Make plots
 
@@ -531,39 +585,6 @@ d.zindiv %>%
     #pull(head_id) %>% unique()
     #pull(pos_type) %>% unique()
     #filter(pos_type=="cls-sep")
-```
-
-grid with heads as columns and layers as rows with heads marked by whether they are causally implicated for verb, context, or both.
-
-```{r}
-tvals.raw <- d.zindiv %>%
-    group_by(layer_id, cue_type, head_id, pos_type) %>%
-    summarize(p.val = t.test(effect_ave)$p.value,
-              t.val = t.test(effect_ave)$statistic) 
-
-tvals.raw %>%
-  mutate(p.log=(-log10(p.val))) %>%
-  mutate(cut_off=-log10(0.01/64/12)) %>%
-  filter(p.log > cut_off) %>%
-  group_by(layer_id, head_id, pos_type) %>%
-  select(layer_id,head_id,pos_type,p.val,cue_type) %>%
-  pivot_wider(names_from = c('cue_type'), values_from = c('p.val')) %>%
-  mutate(combination = case_when(is.na(verb) && !is.na(context)  ~ 'context_only',
-                                    !is.na(verb) && is.na(context) ~ 'verb_only',
-                                    !is.na(verb) && !is.na(context) ~ 'both',
-                                    TRUE ~ 'neither')) %>%
-  mutate(strength = min(-log10(max(verb, context, na.rm = T)) / 5, 1)) %>%
-  filter(combination != 'verb_only') %>%
-  filter(!(pos_type %in% c('period', 'cls-sep', 'context', 'verb'))) %>%
-  #mutate(head_id = fct_reorder(factor(head_id), strength, .desc = T)) %>%
-  ggplot(aes(x = layer_id, y = head_id, fill = combination, color = combination, alpha = strength)) +
-    geom_tile() +
-    facet_grid( ~ pos_type) +
-    #scale_x_reverse(limits = c(12, 0.5)) +
-    scale_fill_colorblind() +
-    scale_color_colorblind() +
-    theme_few() 
-
 ```
 
 # 1.4.2 Attention/Q&K
