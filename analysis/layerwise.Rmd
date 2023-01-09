@@ -20,7 +20,7 @@ colorblind_pal()(8)
 # Import data
 
 ```{r,message=FALSE}
-d.layer.raw <- read_csv(here('results/combined_effect_ave_all/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
+d.layer.raw <- read_csv(here('results/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
 
 sent_list <- d.layer.raw %>%
