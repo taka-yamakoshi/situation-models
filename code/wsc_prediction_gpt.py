@@ -24,7 +24,7 @@ def calc_logprob_gpt(initialSequence, continuation, args):
             outputs = model(input_ids.to(args.device), return_dict=True)
         log_probs = F.log_softmax(outputs.logits.to('cpu'), dim = -1)
         assert log_probs.shape[0]==1
-        return log_probs[0][-2][input_ids[0][-1].item()]
+        return log_probs[0][-2][input_ids[0][-1].item()].item()
     else:
         assert args.model=='gpt3'
         pass_flag = False
