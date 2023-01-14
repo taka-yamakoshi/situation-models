@@ -116,10 +116,17 @@ if __name__=='__main__':
     nlp = spacy.load('en_core_web_lg')
 
     with open(f'winogrande_1.1/train_{args.size}.jsonl','r') as f:
-        file = f.readlines()
-    loaded_data = [json.loads(line) for line in file]
+        file_trn = f.readlines()
+    loaded_data_trn = [json.loads(line) for line in file_trn]
 
-    # Group together schema with the same sentences
+    with open(f'winogrande_1.1/dev_{args.size}.jsonl','r') as f:
+        file_dev = f.readlines()
+    loaded_data_dev = [json.loads(line) for line in file_dev]
+
+    loaded_data = loaded_data_trn + loaded_data_dev
+    print(f'{len(loaded_data)} lines extracted from the jsonl file')
+
+    # Group together schema with the same pair_id
     wsc_data = {}
     for schema in loaded_data:
         qID = schema['qID']
@@ -165,6 +172,7 @@ if __name__=='__main__':
                 schema_data['answer'] = "1"
 
         wsc_data[pair_id].append(schema_data)
+    print(f'{len(wsc_data)} groups extracted from the jsonl file')
 
     # Select schema with exactly two sentences
     os.makedirs('Winogrande/',exist_ok=True)
@@ -180,8 +188,13 @@ if __name__=='__main__':
         if args.verb:
             head += ['verb_1','verb_2','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
         writer.writerow(head)
+        num_invalid_groups = 0
+        num_invalid_answers = 0
+        num_invalid_contexts = 0
         for key,value in wsc_data.items():
-            if len(value)==2:
+            if len(value)!=2:
+                num_invalid_groups += 1
+            else:
                 schema_data_all = {}
                 schema_data_all['pair_id'] = key
 
@@ -196,6 +209,7 @@ if __name__=='__main__':
                     #print('Invalid Answers')
                     #print(value[0]['sentence'])
                     #print(value[1]['sentence'])
+                    num_invalid_answers += 1
                     continue
 
                 assert schema_1['option_1']==schema_2['option_1']
@@ -221,9 +235,11 @@ if __name__=='__main__':
                 context_word_id_2 = FindWord(schema_data_all['sent_2'],context_2)
 
                 if type(context_word_id_1) is str or type(context_word_id_2) is str:
+                    num_invalid_contexts += 1
                     continue
                 assert type(context_word_id_1) is int and type(context_word_id_2) is int
                 if context_word_id_1!=context_word_id_2:
+                    num_invalid_contexts += 1
                     continue
 
                 schema_data_all['context_1'] = context_1.strip(' ,.;:')
@@ -311,3 +327,6 @@ if __name__=='__main__':
                 schema_data_all[f'other'] = other_word
 
                 writer.writerow([schema_data_all[feature] for feature in head])
+        print(f'# invalid groups: {num_invalid_groups}')
+        print(f'# invalid answers: {num_invalid_answers}')
+        print(f'# invalid contexts: {num_invalid_contexts}')
