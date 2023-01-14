@@ -48,7 +48,7 @@ def FindPOS(nlp,sent,word,word_id):
     target_start_id = len(nlp(sent_before_target))
     target_end_id = len(nlp(sent_until_target))
     doc = nlp(sent)
-    assert word==doc[target_start_id:target_end_id].text
+    assert word.strip(' ,.;:')==doc[target_start_id:target_end_id].text.strip(' ,.;:'), f'"{word}" does not match "{doc[target_start_id:target_end_id].text}"'
     pos_labels = [token.pos_ for token in doc][target_start_id:target_end_id]
     tag_labels = [token.tag_ for token in doc][target_start_id:target_end_id]
     return '+'.join([simplify_pos(pos_label,tag_label) for pos_label,tag_label in zip(pos_labels,tag_labels)])
@@ -119,7 +119,7 @@ if __name__=='__main__':
         file_trn = f.readlines()
     loaded_data_trn = [json.loads(line) for line in file_trn]
 
-    with open(f'winogrande_1.1/dev_{args.size}.jsonl','r') as f:
+    with open(f'winogrande_1.1/dev.jsonl','r') as f:
         file_dev = f.readlines()
     loaded_data_dev = [json.loads(line) for line in file_dev]
 
