@@ -41,25 +41,35 @@ def FindWord(sent,phrase):
         return int(candidates[candidate_test][0][0])
 
 def FindContext(sent_1,sent_2):
-    split_sent_1 = sent_1.split(' ')
-    split_sent_2 = sent_2.split(' ')
-    # remove each word from the start until they are different
-    word_id = 0
-    while split_sent_1[word_id]==split_sent_2[word_id]:
-        word_id += 1
-    start_id = word_id
-    # remove each word from the end until they are different
-    word_id = -1
-    while split_sent_1[word_id]==split_sent_2[word_id]:
-        word_id -= 1
-    end_id = word_id+1 if word_id!=-1 else None
+    if sent_1==sent_2:
+        return 0, "", ""
+    else:
+        split_sent_1 = sent_1.split(' ')
+        split_sent_2 = sent_2.split(' ')
+        min_sent_len = min(len(split_sent_1),len(split_sent_2))
+        # remove each word from the start until they are different
+        word_id = 0
+        while split_sent_1[word_id]==split_sent_2[word_id]:
+            word_id += 1
+            if word_id==min_sent_len:
+                word_id -= 1
+                break
+        start_id = word_id
+        # remove each word from the end until they are different
+        word_id = -1
+        while split_sent_1[word_id]==split_sent_2[word_id]:
+            word_id -= 1
+            if word_id==-min_sent_len-1:
+                word_id += 1
+                break
+        end_id = word_id+1 if word_id!=-1 else None
 
-    context_words_1 = split_sent_1[start_id:end_id]
-    context_words_2 = split_sent_2[start_id:end_id]
+        context_words_1 = split_sent_1[start_id:end_id]
+        context_words_2 = split_sent_2[start_id:end_id]
 
-    context_1 = ' '.join(context_words_1)
-    context_2 = ' '.join(context_words_2)
-    return start_id, context_1, context_2
+        context_1 = ' '.join(context_words_1)
+        context_2 = ' '.join(context_words_2)
+        return start_id, context_1, context_2
 
 def FindPOS(nlp,sent,word,word_id):
     sent_before_target = ' '.join(sent.split(' ')[:word_id])
