@@ -128,6 +128,9 @@ if __name__=='__main__':
 
     # Group together schema with the same pair_id
     wsc_data = {}
+    num_invalid_matches_pron = [0,0]
+    num_invalid_matches_option_1 = [0,0]
+    num_invalid_matches_option_2 = [0,0]
     for schema in loaded_data:
         qID = schema['qID']
         pair_id = qID.split('-')[0]
@@ -149,6 +152,17 @@ if __name__=='__main__':
         option_2_word_id = FindWord(schema_data['sentence'],option_2)
 
         if type(pron_word_id) is str or type(option_1_word_id) is str or type(option_2_word_id) is str:
+            out_str_list = ['multiple matches','no match']
+            if type(pron_word_id) is str:
+                assert pron_word_id in out_str_list
+                num_invalid_matches_pron[out_str_list.index(pron_word_id)] += 1
+            if type(option_1_word_id) is str:
+                assert option_1_word_id in out_str_list
+                num_invalid_matches_option_1[out_str_list.index(option_1_word_id)] += 1
+            if type(option_2_word_id) is str:
+                assert option_2_word_id in out_str_list
+                print(schema)
+                num_invalid_matches_option_2[out_str_list.index(option_2_word_id)] += 1
             continue
         assert type(pron_word_id) is int and type(option_1_word_id) is int and type(option_2_word_id) is int
 
@@ -173,6 +187,9 @@ if __name__=='__main__':
 
         wsc_data[pair_id].append(schema_data)
     print(f'{len(wsc_data)} groups extracted from the jsonl file')
+    print(f'invalid match for pronoun:{num_invalid_matches_pron}')
+    print(f'invalid match for option_1:{num_invalid_matches_option_1}')
+    print(f'invalid match for option_2:{num_invalid_matches_option_2}')
 
     # Select schema with exactly two sentences
     os.makedirs('Winogrande/',exist_ok=True)
@@ -189,11 +206,21 @@ if __name__=='__main__':
             head += ['verb_1','verb_2','verb_word_id_1','verb_word_id_2','verb_pos','verb_tag']
         writer.writerow(head)
         num_invalid_groups = 0
+        num_empty = 0
+        num_singles = 0
+        num_triples_or_more = 0
         num_invalid_answers = 0
         num_invalid_contexts = 0
         for key,value in wsc_data.items():
             if len(value)!=2:
                 num_invalid_groups += 1
+                if len(value)==0:
+                    num_empty += 1
+                elif len(value)==1:
+                    num_singles += 1
+                else:
+                    print(value)
+                    num_triples_or_more += 1
             else:
                 schema_data_all = {}
                 schema_data_all['pair_id'] = key
@@ -328,5 +355,8 @@ if __name__=='__main__':
 
                 writer.writerow([schema_data_all[feature] for feature in head])
         print(f'# invalid groups: {num_invalid_groups}')
+        print(f'# empty: {num_empty}')
+        print(f'# sinlges: {num_singles}')
+        print(f'# triples or more: {num_triples_or_more}')
         print(f'# invalid answers: {num_invalid_answers}')
         print(f'# invalid contexts: {num_invalid_contexts}')
