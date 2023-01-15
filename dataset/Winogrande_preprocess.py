@@ -14,7 +14,20 @@ def FindWord(sent,phrase):
     split_sent = sent.split(' ')
     split_phrase = phrase.split(' ')
     # find each word in the phrase
-    find_phrase = [[word_id for word_id, sent_word in enumerate(split_sent) if sent_word==phrase_word] for phrase_word in split_phrase]
+    find_phrase = []
+    for phrase_word in split_phrase:
+        find_phrase_word = []
+        for word_id, sent_word in enumerate(split_sent):
+            stripped_word = sent_word.strip(' ,.;:!?')
+            stripped_word_list = [sent_word,stripped_word,
+                                    stripped_word.replace("'s","").replace(";s","").replace("’s","")]
+            #if stripped_word.endswith('s'):
+            #    stripped_word_list.append(stripped_word[:-1])
+            #if stripped_word.endswith('es'):
+            #    stripped_word_list.append(stripped_word[:-2])
+            if phrase_word in stripped_word_list or phrase_word.lower() in stripped_word_list or phrase_word.capitalize() in stripped_word_list:
+                find_phrase_word.append(word_id)
+        find_phrase.append(find_phrase_word)
     # consider all possible combinations
     candidates = np.array(list(itertools.product(*find_phrase)))
     # find ones that are in a sequence
@@ -30,17 +43,23 @@ def FindWord(sent,phrase):
 def FindContext(sent_1,sent_2):
     split_sent_1 = sent_1.split(' ')
     split_sent_2 = sent_2.split(' ')
-    context_words_1 = []
-    context_words_2 = []
-    for i,line in enumerate(difflib.unified_diff(split_sent_1,split_sent_2)):
-        if i>2:
-            if line.startswith('-'):
-                context_words_1.append(line[1:])
-            elif line.startswith('+'):
-                context_words_2.append(line[1:])
+    # remove each word from the start until they are different
+    word_id = 0
+    while split_sent_1[word_id]==split_sent_2[word_id]:
+        word_id += 1
+    start_id = word_id
+    # remove each word from the end until they are different
+    word_id = -1
+    while split_sent_1[word_id]==split_sent_2[word_id]:
+        word_id -= 1
+    end_id = word_id+1 if word_id!=-1 else None
+
+    context_words_1 = split_sent_1[start_id:end_id]
+    context_words_2 = split_sent_2[start_id:end_id]
+
     context_1 = ' '.join(context_words_1)
     context_2 = ' '.join(context_words_2)
-    return context_1, context_2
+    return start_id, context_1, context_2
 
 def FindPOS(nlp,sent,word,word_id):
     sent_before_target = ' '.join(sent.split(' ')[:word_id])
@@ -131,6 +150,7 @@ if __name__=='__main__':
     num_invalid_matches_pron = [0,0]
     num_invalid_matches_option_1 = [0,0]
     num_invalid_matches_option_2 = [0,0]
+    num_invalid_matches = 0
     for schema in loaded_data:
         qID = schema['qID']
         pair_id = qID.split('-')[0]
@@ -158,11 +178,15 @@ if __name__=='__main__':
                 num_invalid_matches_pron[out_str_list.index(pron_word_id)] += 1
             if type(option_1_word_id) is str:
                 assert option_1_word_id in out_str_list
+                #if option_1_word_id=='no match':
+                #    print(schema)
                 num_invalid_matches_option_1[out_str_list.index(option_1_word_id)] += 1
             if type(option_2_word_id) is str:
                 assert option_2_word_id in out_str_list
-                print(schema)
+                #if option_2_word_id=='no match':
+                #    print(schema)
                 num_invalid_matches_option_2[out_str_list.index(option_2_word_id)] += 1
+            num_invalid_matches += 1
             continue
         assert type(pron_word_id) is int and type(option_1_word_id) is int and type(option_2_word_id) is int
 
@@ -190,6 +214,7 @@ if __name__=='__main__':
     print(f'invalid match for pronoun:{num_invalid_matches_pron}')
     print(f'invalid match for option_1:{num_invalid_matches_option_1}')
     print(f'invalid match for option_2:{num_invalid_matches_option_2}')
+    print(f'total invalid matches:{num_invalid_matches}')
 
     # Select schema with exactly two sentences
     os.makedirs('Winogrande/',exist_ok=True)
@@ -211,6 +236,8 @@ if __name__=='__main__':
         num_triples_or_more = 0
         num_invalid_answers = 0
         num_invalid_contexts = 0
+        num_empty_other_words = 0
+        num_invalid_other_words = 0
         for key,value in wsc_data.items():
             if len(value)!=2:
                 num_invalid_groups += 1
@@ -253,25 +280,28 @@ if __name__=='__main__':
                     schema_data_all[f'option_2_word_id_{sent_id}'] = schema_data['option_2_word_id']
 
                 # Identify the context word
-                context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
+                context_word_id,context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
+                if context_1=="" or context_2=="":
+                    num_invalid_contexts += 1
+                    continue
                 #if len(context_1.split(' '))>5 or len(context_2.split(' '))>5:
                 #    continue
                 #if "'" in context_1 or "'" in context_2 or "_" in context_1 or "_" in context_2 or "’" in context_1 or "’" in context_2:
                 #    continue
-                context_word_id_1 = FindWord(schema_data_all['sent_1'],context_1)
-                context_word_id_2 = FindWord(schema_data_all['sent_2'],context_2)
+                #context_word_id_1 = FindWord(schema_data_all['sent_1'],context_1)
+                #context_word_id_2 = FindWord(schema_data_all['sent_2'],context_2)
 
-                if type(context_word_id_1) is str or type(context_word_id_2) is str:
-                    num_invalid_contexts += 1
-                    continue
-                assert type(context_word_id_1) is int and type(context_word_id_2) is int
-                if context_word_id_1!=context_word_id_2:
-                    num_invalid_contexts += 1
-                    continue
+                #if type(context_word_id_1) is str or type(context_word_id_2) is str:
+                #    num_invalid_contexts += 1
+                #    continue
+                #assert type(context_word_id_1) is int and type(context_word_id_2) is int
+                #if context_word_id_1!=context_word_id_2:
+                #    num_invalid_contexts += 1
+                #    continue
 
-                schema_data_all['context_1'] = context_1.strip(' ,.;:')
-                schema_data_all['context_2'] = context_2.strip(' ,.;:')
-                schema_data_all['context_word_id'] = context_word_id_1
+                schema_data_all['context_1'] = context_1.strip(' ,.;:!?')
+                schema_data_all['context_2'] = context_2.strip(' ,.;:!?')
+                schema_data_all['context_word_id'] = context_word_id
 
                 context_1_pos = FindPOS(nlp,schema_data_all['sent_1'],
                                         schema_data_all['context_1'],schema_data_all['context_word_id'])
@@ -335,14 +365,16 @@ if __name__=='__main__':
                     other_word_ids_list.append(other_word_ids)
                     other_words_list.append(other_words)
 
-                assert len(other_words_list[0])==len(other_words_list[1])
+                assert len(other_words_list[0])==len(other_words_list[1]),schema_data_all
+                if len(other_words_list[0])==0:
+                    num_empty_other_words += 1
+                    continue
                 if not np.all([word_1==word_2 for word_1,word_2 in zip(other_words_list[0],other_words_list[1])]):
-                    #print(other_words_1)
-                    #print(other_words_2)
+                    num_invalid_other_words += 1
                     continue
 
                 other_word = ''
-                while other_word.strip(' ,.;:')=='':
+                while other_word.strip(' ,.;:!?')=='':
                     rand_id = np.random.choice(len(other_words_list[0]))
                     other_word_id_1 = other_word_ids_list[0][rand_id]
                     other_word_id_2 = other_word_ids_list[1][rand_id]
@@ -360,3 +392,5 @@ if __name__=='__main__':
         print(f'# triples or more: {num_triples_or_more}')
         print(f'# invalid answers: {num_invalid_answers}')
         print(f'# invalid contexts: {num_invalid_contexts}')
+        print(f'# empty other words: {num_empty_other_words}')
+        print(f'# invalid other words: {num_invalid_other_words}')
