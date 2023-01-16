@@ -24,7 +24,7 @@ if __name__=='__main__':
     parser.add_argument('--model', type = str, required = True)
     parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande','combined'])
     parser.add_argument('--stimuli', type = str,
-                        choices=['original','control','synonym_1','synonym_2'],
+                        choices=['original','control','synonym_1','synonym_2','original_verb'],
                         #'original_verb','control_combined','control_combined_verb','synonym_verb'],
                         default='original')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
