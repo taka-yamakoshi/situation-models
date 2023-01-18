@@ -72,6 +72,8 @@ def FindContext(sent_1,sent_2):
             return 0, "", ""
         elif '.' in context_words_1 or '.' in context_words_2:
             return 0, "", ""
+        elif len(context_words_1) > 5 or len(context_words_2) > 5:
+            return 0, "", ""
         else:
             return start_id, context_1, context_2
 
