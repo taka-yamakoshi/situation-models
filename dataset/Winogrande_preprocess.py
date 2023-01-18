@@ -66,7 +66,11 @@ def FindContext(sent_1,sent_2):
         context_1 = ' '.join(context_words_1)
         context_2 = ' '.join(context_words_2)
 
-        if '_' in context_1 or '_' in context_2 or len(context_words_1)>5 or len(context_words_2)>5:
+        if '_' in context_words_1 or '_' in context_words_2:
+            return 0, "", ""
+        elif ',' in context_words_1 or ',' in context_words_2:
+            return 0, "", ""
+        elif '.' in context_words_1 or '.' in context_words_2:
             return 0, "", ""
         else:
             return start_id, context_1, context_2
@@ -248,6 +252,7 @@ if __name__=='__main__':
         num_invalid_contexts = 0
         num_empty_other_words = 0
         num_invalid_other_words = 0
+        num_invalid_punct = 0
         for key,value in wsc_data.items():
             if len(value)!=2:
                 num_invalid_groups += 1
@@ -288,6 +293,11 @@ if __name__=='__main__':
                     schema_data_all[f'pron_word_id_{sent_id}'] = schema_data['pron_word_id']
                     schema_data_all[f'option_1_word_id_{sent_id}'] = schema_data['option_1_word_id']
                     schema_data_all[f'option_2_word_id_{sent_id}'] = schema_data['option_2_word_id']
+
+                invalid_punct_1 = np.sum([word.startswith('.') or word.startswith(',') for word in schema_data_all['sent_1'].split(' ')])
+                invalid_punct_2 = np.sum([word.startswith('.') or word.startswith(',') for word in schema_data_all['sent_2'].split(' ')])
+                if invalid_punct_1 > 0 or invalid_punct_2 > 0:
+                    num_invalid_punct += 1
 
                 # Identify the context word
                 context_word_id,context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
@@ -405,3 +415,4 @@ if __name__=='__main__':
         print(f'# invalid contexts: {num_invalid_contexts}')
         print(f'# empty other words: {num_empty_other_words}')
         print(f'# invalid other words: {num_invalid_other_words}')
+        print(f'# invalid punct: {num_invalid_punct}')
