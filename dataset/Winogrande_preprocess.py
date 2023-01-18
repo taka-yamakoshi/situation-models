@@ -21,10 +21,6 @@ def FindWord(sent,phrase):
             stripped_word = sent_word.strip(' ,.;:!?')
             stripped_word_list = [sent_word,stripped_word,
                                     stripped_word.replace("'s","").replace(";s","").replace("’s","")]
-            #if stripped_word.endswith('s'):
-            #    stripped_word_list.append(stripped_word[:-1])
-            #if stripped_word.endswith('es'):
-            #    stripped_word_list.append(stripped_word[:-2])
             if phrase_word in stripped_word_list or phrase_word.lower() in stripped_word_list or phrase_word.capitalize() in stripped_word_list:
                 find_phrase_word.append(word_id)
         find_phrase.append(find_phrase_word)
@@ -69,7 +65,11 @@ def FindContext(sent_1,sent_2):
 
         context_1 = ' '.join(context_words_1)
         context_2 = ' '.join(context_words_2)
-        return start_id, context_1, context_2
+
+        if '_' in context_1 or '_' in context_2 or len(context_words_1)>5 or len(context_words_2)>5:
+            return 0, "", ""
+        else:
+            return start_id, context_1, context_2
 
 def FindPOS(nlp,sent,word,word_id):
     sent_before_target = ' '.join(sent.split(' ')[:word_id])
@@ -312,6 +312,7 @@ if __name__=='__main__':
                 schema_data_all['context_1'] = context_1.strip(' ,.;:!?')
                 schema_data_all['context_2'] = context_2.strip(' ,.;:!?')
                 schema_data_all['context_word_id'] = context_word_id
+                print(schema_data_all['context_1'],schema_data_all['context_2'])
 
                 context_1_pos = FindPOS(nlp,schema_data_all['sent_1'],
                                         schema_data_all['context_1'],schema_data_all['context_word_id'])
