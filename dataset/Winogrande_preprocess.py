@@ -300,6 +300,7 @@ if __name__=='__main__':
                 invalid_punct_2 = np.sum([word.startswith('.') or word.startswith(',') for word in schema_data_all['sent_2'].split(' ')])
                 if invalid_punct_1 > 0 or invalid_punct_2 > 0:
                     num_invalid_punct += 1
+                    continue
 
                 # Identify the context word
                 context_word_id,context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
