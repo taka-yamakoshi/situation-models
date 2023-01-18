@@ -407,6 +407,14 @@ if __name__=='__main__':
                 schema_data_all[f'other'] = other_word
 
                 writer.writerow([schema_data_all[feature] for feature in head])
+
+        print(f'{len(loaded_data)} lines extracted from the jsonl file')
+        print(f'{len(wsc_data)} groups extracted from the jsonl file')
+        print(f'---invalid match for pronoun:{num_invalid_matches_pron}')
+        print(f'---invalid match for option_1:{num_invalid_matches_option_1}')
+        print(f'---invalid match for option_2:{num_invalid_matches_option_2}')
+        print(f'---total invalid matches:{num_invalid_matches}')
+
         print(f'# invalid groups: {num_invalid_groups}')
         print(f'# empty: {num_empty}')
         print(f'# sinlges: {num_singles}')
