@@ -6,16 +6,16 @@ import torch.nn.functional as F
 import argparse
 import json
 import csv
-from wsc_utils import CalcOutputs, EvaluatePredictions, LoadDataset, LoadModel, GetReps, ExtractQKV, EvaluateQKV
-from wsc_intervention import ApplyInterventions, EvaluateResults
-from model_skeleton import skeleton_model, ExtractAttnLayer
-from wsc_attention import EvaluateAttention,convert_to_numpy
+from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model, get_reps, extract_QKV, evaluate_QKV
+from model_skeleton import skeleton_model, extract_attn_layer
+from wsc_attention import evaluate_attention,convert_to_numpy
+from wsc_intervention import apply_interventions, evaluate_results
 import pandas as pd
 import time
 import math
 import os
 
-def CalcSeqLen(head,line,tokenizer):
+def calc_seq_len(head,line,tokenizer):
     sent_1,sent_2 = line[head.index('sent_1')],line[head.index('sent_2')]
     tokenized_sent_1 = tokenizer(sent_1,return_tensors='pt')['input_ids']
     tokenized_sent_2 = tokenizer(sent_1,return_tensors='pt')['input_ids']
@@ -55,13 +55,13 @@ if __name__=='__main__':
     else:
         mask_context_id = ''
 
-    head,text = LoadDataset(args)
+    head,text = load_dataset(args)
     pair_ids = [row[head.index('pair_id')] for row in text]
     assert args.pair_id in pair_ids and np.sum([args.pair_id==element for element in pair_ids])==1
 
-    model, tokenizer, mask_id, args = LoadModel(args)
+    model, tokenizer, mask_id, args = load_model(args)
     args.num_layers = model.config.num_hidden_layers
-    attn_layer = ExtractAttnLayer(0,model,args)
+    attn_layer = extract_attn_layer(0,model,args)
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
@@ -85,7 +85,7 @@ if __name__=='__main__':
                                 *[f'options-key-dist_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
         line = text[pair_ids.index(args.pair_id)]
-        seq_len = CalcSeqLen(head,line,tokenizer)
+        seq_len = calc_seq_len(head,line,tokenizer)
 
         rep_types = ['layer-query-key-value','z_rep','z_rep','value']
         cascade_types = [False,True,False,False]
@@ -93,26 +93,26 @@ if __name__=='__main__':
         for rep,cascade_id,multihead_id in zip(rep_types, cascade_types, multihead_types):
             args.cascade, args.multihead = cascade_id, multihead_id
             for pos in range(seq_len):
-                results = ApplyInterventions(head,line,[f'token_{pos}'],rep.split('-'),model,tokenizer,mask_id,args)
+                results = apply_interventions(head,line,[f'token_{pos}'],rep.split('-'),model,tokenizer,mask_id,args)
                 if type(results) is str:
                     raise NotImplementedError("Sequence lengths do not match")
                 else:
-                    original_1,original_2,original_attn_1,original_attn_2,original_score = EvaluateResults(results['original'],0,args)
+                    original_1,original_2,original_attn_1,original_attn_2,original_score = evaluate_results(results['original'],0,args)
 
-                    original_qry_dist,original_qry_cos = EvaluateQKV('qry',results['original'],results['original'],0,0,args)
-                    original_key_dist,original_key_cos = EvaluateQKV('key',results['original'],results['original'],0,0,args)
+                    original_qry_dist,original_qry_cos = evaluate_QKV('qry',results['original'],results['original'],0,0,args)
+                    original_key_dist,original_key_cos = evaluate_QKV('key',results['original'],results['original'],0,0,args)
                     for layer_id in range(args.num_layers):
                         result_dict = results[f'layer_{layer_id}']
                         for head_id in range(args.num_heads):
-                            interv_1,interv_2,interv_attn_1,interv_attn_2,interv_score = EvaluateResults(result_dict,head_id,args)
+                            interv_1,interv_2,interv_attn_1,interv_attn_2,interv_score = evaluate_results(result_dict,head_id,args)
 
                             effect_1 = original_1-interv_1
                             effect_2 = interv_2-original_2
                             effect_attn_1 = original_attn_1-interv_attn_1
                             effect_attn_2 = interv_attn_2-original_attn_2
 
-                            interv_qry_dist,interv_qry_cos = EvaluateQKV('qry',result_dict,results['original'],head_id,0,args)
-                            interv_key_dist,interv_key_cos = EvaluateQKV('key',result_dict,results['original'],head_id,0,args)
+                            interv_qry_dist,interv_qry_cos = evaluate_QKV('qry',result_dict,results['original'],head_id,0,args)
+                            interv_key_dist,interv_key_cos = evaluate_QKV('key',result_dict,results['original'],head_id,0,args)
                             assert len(interv_qry_dist)==args.num_heads and len(interv_qry_cos)==args.num_heads
                             assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
