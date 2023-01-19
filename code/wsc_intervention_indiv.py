@@ -65,14 +65,13 @@ if __name__=='__main__':
     args.num_heads = attn_layer.num_attention_heads
     args.head_dim = attn_layer.attention_head_size
 
-    if args.dataset=='superglue':
-        out_file_name = f'{os.environ.get("MY_DATA_PATH")}/superglue_wsc_intervention_{args.intervention_type}'\
-                        +f'_indiv_{args.pair_id}_{args.model}_{args.stimuli}{mask_context_id}'\
-                        +f'_layer_{args.layer}_head_{args.head}{test_id}'
-    elif args.dataset=='winogrande':
-        out_file_name = f'{os.environ.get("MY_DATA_PATH")}/winogrande_{args.size}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
-                        +f'_indiv_{args.pair_id}_{args.model}'\
-                        +f'_layer_{args.layer}_head_{args.head}{test_id}'
+    os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/intervention_indiv/',exist_ok=True)
+    dataset_name = args.dataset + f'_{args.size}' if args.dataset == 'winogrande' else args.dataset
+
+    out_file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention_indiv/'\
+                    +f'{dataset_name}_{args.stimuli}{mask_context_id}_intervention_{args.intervention_type}'\
+                    +f'_indiv_{args.pair_id}_{args.model}'\
+                    +f'_layer_{args.layer}_head_{args.head}{test_id}'
 
     with open(f'{out_file_name}.csv','w') as f:
         writer = csv.writer(f)
