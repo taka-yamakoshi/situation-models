@@ -78,6 +78,7 @@ if __name__=='__main__':
         writer = csv.writer(f)
         writer.writerow(head+['interv_type','rep','pos','cascade','multihead',
                                 'layer_id','head_id','original_score','score','effect_ave',
+                                'original_1','original_2','interv_1','interv_2','effect_1','effect_2',
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-dist_effect_{head_id}' for head_id in range(args.num_heads)],
@@ -118,6 +119,7 @@ if __name__=='__main__':
 
                             writer.writerow(line+['interv',rep,pos,cascade_id,multihead_id,
                                                     layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
+                                                    original_1,original_2,interv_1,interv_2,effect_1,effect_2,
                                                     *list((interv_attn_1-interv_attn_2)/2),
                                                     *list((effect_attn_1+effect_attn_2)/2),
                                                     *list(original_qry_dist-interv_qry_dist),
@@ -126,6 +128,7 @@ if __name__=='__main__':
                                                     *list(interv_key_cos-original_key_cos)])
                             writer.writerow(line+['original',rep,pos,cascade_id,multihead_id,
                                                     layer_id,head_id,original_score,original_score,0.0,
+                                                    original_1,original_2,original_1,original_2,0.0,0.0,
                                                     *list((original_attn_1-original_attn_2)/2),
                                                     *[0.0 for _ in range(args.num_heads)],
                                                     *[0.0 for _ in range(args.num_heads)],
