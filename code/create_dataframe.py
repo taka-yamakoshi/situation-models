@@ -104,7 +104,8 @@ if __name__ =='__main__':
                     file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                     +f'{pos_type}_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
-                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,'original_1','original_2'])
+                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,
+                                                     'original_1','original_2','interv_1','interv_2','effect_1','effect_2'])
                     if choose_head_0:
                         loaded_df = loaded_df.loc[lambda d: d['head_id']==0]
                     loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
