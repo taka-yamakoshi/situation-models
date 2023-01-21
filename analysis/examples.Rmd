@@ -1,0 +1,126 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(tidyboot)
+library(ggh4x)
+```
+
+# fine-grained analyses
+
+```{r,message=FALSE}
+# 24 is "Paul tried to call George on the phone, but he wasn't successful."
+# 7 is "Sam took French classes from Adam, because he was eager to speak it fluently."
+# 20 is "Bob collapsed on the sidewalk. Soon he saw Carl coming to help. He was very ill."
+# 10 is "the journalists interviewed the stars of the new movie . [MASK] [MASK] were very persistent , so the interview lasted for a long time"
+example_id <- '24' 
+model_id <- 'albert-xxlarge-v2_layer_all_head_all'
+intervention <- 'superglue_original_verb_intervention' # 
+d.zindiv.raw <- str_glue('dataset/{intervention}_swap_indiv_{example_id}_{model_id}.csv') %>%
+  here() %>%
+  read_csv() 
+
+intervention <- 'superglue_control_combined_verb_mask_context_intervention'
+d.zindiv.raw.verb <- str_glue('dataset/{intervention}_swap_indiv_{example_id}_{model_id}.csv') %>%
+  here() %>%
+  read_csv() #%>%
+
+  # mutate(original_2 = log(1/exp(original_2)),
+  #       interv_2 = log(1/exp(interv_2))) %>%
+  # mutate(effect_1_normed = (exp(original_1) - exp(interv_1))/exp(original_1),
+  #       effect_2_normed = (exp(original_2) - exp(interv_2))/exp(original_2),
+  #       effect_ave = (effect_1_normed + effect_2_normed)/2)
+
+```
+
+```{r}
+tokenized1_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'wasn', "'", 't', 'successful', '.')
+tokenized2_verb <- c('they', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'wasn', "'", 't', 'MASK', '.')
+tokenized2_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'he', 'wasn', "'", 't', 'available', '.')
+# tokenized <- strsplit('sam took french classes from adam , because he was eager to speak it fluent ly .', split = ' ')[[1]]
+# tokenized <- strsplit('bob collapsed on the sidewalk . soon he saw carl coming to help . he was very ill .', split = ' ')[[1]]
+# tokenized <- strsplit('the journalists interviewed the stars of the new movie . [MASK] [MASK] were very cooperative , so the interview lasted for a long time .', split = ' ')[[1]]
+# tokenized <- strsplit('the journalists interviewed the stars of the new movie . [MASK] [MASK] were very persistent , so the interview lasted for a long time .', split = ' ')[[1]]
+```
+
+Look at full cascade with multi-head layer-wise intervention
+
+```{r}
+d.zindiv.raw %>% 
+  #filter(rep == 'layer-query-key-value') %>%
+  filter(rep == 'z_rep', cascade == T) %>%
+  filter(interv_type == 'interv') %>%
+  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
+  group_by(pos, layer_id) %>%
+  filter(head_id == 30) %>%
+  summarize(effect_ave = min(2, max(0, mean(effect_1)))) %>%
+  ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
+    geom_tile() +
+    scale_fill_gradient(low = 'white', high = 'red') +
+    scale_color_gradient(low = 'white', high = 'red') +
+    scale_y_continuous(breaks = seq(length(tokenized1_context)), labels = rev(tokenized1_context)) +
+    #facet_wrap(~head_id) +
+    labs(x = '') +
+    theme_few() +
+    theme(aspect.ratio = 3, legend.position = 'top', legend.key.width = unit(.5,"in"))
+
+ggsave(str_glue('sentence_{example_id}_zrep.pdf'), height = 4, width = 3, units = 'in')
+#ggsave(str_glue('sentence_{example_id}_heads.pdf'), height = 12, width = 12, units = 'in')
+```
+
+
+```{r}
+example_head <- 7
+
+d.zindiv.raw %>% 
+  #filter(rep == 'layer-query-key-value') %>%
+  filter(rep == 'value') %>%
+  #filter(rep == 'z_rep', cascade == F) %>%
+  filter(interv_type == 'interv') %>%
+  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
+  group_by(pos, layer_id) %>%
+  filter(head_id == example_head) %>%
+  filter(pos > 0, pos <= length(tokenized1_context)) %>%
+  summarize(effect_ave = min(1, max(0, mean(effect_2)))) %>%
+  ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
+    geom_tile() +
+    scale_fill_gradient(low = 'white', high = 'red') +
+    scale_color_gradient(low = 'white', high = 'red') +
+    scale_y_continuous(breaks = seq(length(tokenized1_context)), labels = rev(tokenized1_context)) +
+    #facet_wrap(~head_id) +
+    labs(x = '', y = '') +
+    theme_few() +
+    theme(aspect.ratio = 3, legend.key.height = unit(.5,"in"))
+
+ggsave(str_glue('sentence_{example_id}_head{example_head}_value.pdf'), height = 4, width = 3, units = 'in')
+```
+
+```{r}
+d.zindiv.raw.verb %>% 
+  #filter(rep == 'layer-query-key-value') %>%
+  #filter(rep == 'value') %>%
+  filter(rep == 'z_rep', cascade == F) %>%
+  filter(interv_type == 'interv') %>%
+  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
+  group_by(pos, layer_id) %>%
+  filter(head_id == example_head) %>%
+  filter(pos > 0, pos <= length(tokenized1_context)) %>%
+  summarize(effect_ave = min(1, max(0, mean(effect_2)))) %>%
+  ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
+    geom_tile() +
+    scale_fill_gradient(low = 'white', high = 'red') +
+    scale_color_gradient(low = 'white', high = 'red') +
+    scale_y_continuous(breaks = seq(length(tokenized1_verb)), labels = rev(tokenized1_verb)) +
+    #facet_wrap(~head_id) +
+    labs(x = '') +
+    theme_few() +
+    theme(aspect.ratio = 3, legend.key.height = unit(.5,"in"))
+
+ggsave(str_glue('sentence_{example_id}_head{example_head}_zrep_verb.pdf'), height = 4, width = 3, units = 'in')
+```
