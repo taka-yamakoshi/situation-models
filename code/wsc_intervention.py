@@ -204,6 +204,11 @@ def check_num_tokens(outputs_1,outputs_2,token_ids_1,token_ids_2,args):
         return False
 
 def evaluate_results(result,head_id,args):
+    out_dict = {}
+    for option_id in range(2):
+        for sent_id in [1,2]:
+            out_dict[f'logprob_ave_option_{option_id+1}_sent_{sent_id}'] = result[f'ave_{sent_id}'][option_id][head_id]
+            out_dict[f'logprob_sum_option_{option_id+1}_sent_{sent_id}'] = result[f'sum_{sent_id}'][option_id][head_id]
     llr_1 = result['ave_1'][0][head_id]-result['ave_1'][1][head_id]
     llr_2 = result['ave_2'][0][head_id]-result['ave_2'][1][head_id]
     attn_1 = np.array([result['masks-option-diff_1'][head_id,target_head_id]
@@ -214,7 +219,12 @@ def evaluate_results(result,head_id,args):
         score = (llr_1>0)&(llr_2>0)
     else:
         score = (llr_1>0)&(llr_2<0)
-    return llr_1,llr_2,attn_1,attn_2,score
+    out_dict['llr_1'] = llr_1
+    out_dict['llr_2'] = llr_2
+    out_dict['attn_1'] = attn_1
+    out_dict['attn_2'] = attn_2
+    out_dict['score'] = score
+    return out_dict
 
 if __name__=='__main__':
     start = time.time()
@@ -282,6 +292,10 @@ if __name__=='__main__':
         writer = csv.writer(f)
         writer.writerow(head+['interv_type','layer_id','head_id','original_score','score','effect_ave',
                                 'original_1','original_2','interv_1','interv_2','effect_1','effect_2',
+                                *[f'logprob_ave_option_{option_id+1}_sent_1' for option_id in range(2)],
+                                *[f'logprob_ave_option_{option_id+1}_sent_2' for option_id in range(2)],
+                                *[f'logprob_sum_option_{option_id+1}_sent_1' for option_id in range(2)],
+                                *[f'logprob_sum_option_{option_id+1}_sent_2' for option_id in range(2)],
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-dist_effect_{head_id}' for head_id in range(args.num_heads)],
@@ -298,19 +312,19 @@ if __name__=='__main__':
                 continue
             else:
                 sent_num += 1
-                original_1,original_2,original_attn_1,original_attn_2,original_score = evaluate_results(results['original'],0,args)
+                original_results = evaluate_results(results['original'],0,args)
 
                 original_qry_dist,original_qry_cos = evaluate_QKV('qry',results['original'],results['original'],0,0,args)
                 original_key_dist,original_key_cos = evaluate_QKV('key',results['original'],results['original'],0,0,args)
                 for layer_id in range(args.num_layers):
                     result_dict = results[f'layer_{layer_id}']
                     for head_id in range(args.num_heads):
-                        interv_1,interv_2,interv_attn_1,interv_attn_2,interv_score = evaluate_results(result_dict,head_id,args)
+                        interv_results = evaluate_results(result_dict,head_id,args)
 
-                        effect_1 = original_1-interv_1
-                        effect_2 = interv_2-original_2
-                        effect_attn_1 = original_attn_1-interv_attn_1
-                        effect_attn_2 = interv_attn_2-original_attn_2
+                        effect_1 = original_results['llr_1']-interv_results['llr_1']
+                        effect_2 = interv_results['llr_2']-original_results['llr_2']
+                        effect_attn_1 = original_results['attn_1']-interv_results['attn_1']
+                        effect_attn_2 = interv_results['attn_2']-original_results['attn_2']
 
                         interv_qry_dist,interv_qry_cos = evaluate_QKV('qry',result_dict,results['original'],head_id,0,args)
                         interv_key_dist,interv_key_cos = evaluate_QKV('key',result_dict,results['original'],head_id,0,args)
@@ -319,6 +333,10 @@ if __name__=='__main__':
 
                         writer.writerow(line+['interv',layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
                                                 original_1,original_2,interv_1,interv_2,effect_1,effect_2,
+                                                *[interv_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                *[interv_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                *[interv_results[f'logprob_sum_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                *[interv_results[f'logprob_sum_option_{option_id+1}_sent_2'] for option_id in range(2)],
                                                 *list((interv_attn_1-interv_attn_2)/2),
                                                 *list((effect_attn_1+effect_attn_2)/2),
                                                 *list(original_qry_dist-interv_qry_dist),
@@ -327,6 +345,10 @@ if __name__=='__main__':
                                                 *list(interv_key_cos-original_key_cos)])
                         writer.writerow(line+['original',layer_id,head_id,original_score,original_score,0.0,
                                                 original_1,original_2,original_1,original_2,0.0,0.0,
+                                                *[original_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                *[original_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                *[original_results[f'logprob_sum_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                *[original_results[f'logprob_sum_option_{option_id+1}_sent_2'] for option_id in range(2)],
                                                 *list((original_attn_1-original_attn_2)/2),
                                                 *[0.0 for _ in range(args.num_heads)],
                                                 *[0.0 for _ in range(args.num_heads)],
