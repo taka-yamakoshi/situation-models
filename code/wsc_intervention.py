@@ -331,7 +331,7 @@ if __name__=='__main__':
                         assert len(interv_qry_dist)==args.num_heads and len(interv_qry_cos)==args.num_heads
                         assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
-                        writer.writerow(line+['interv',layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
+                        writer.writerow(line+['interv',layer_id,head_id,original_results['score'],interv_results['score'],(effect_1+effect_2)/2,
                                                 original_1,original_2,interv_1,interv_2,effect_1,effect_2,
                                                 *[interv_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
                                                 *[interv_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
@@ -343,7 +343,7 @@ if __name__=='__main__':
                                                 *list(interv_qry_cos-original_qry_cos),
                                                 *list(original_key_dist-interv_key_dist),
                                                 *list(interv_key_cos-original_key_cos)])
-                        writer.writerow(line+['original',layer_id,head_id,original_score,original_score,0.0,
+                        writer.writerow(line+['original',layer_id,head_id,original_results['score'],original_results['score'],0.0,
                                                 original_1,original_2,original_1,original_2,0.0,0.0,
                                                 *[original_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
                                                 *[original_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
