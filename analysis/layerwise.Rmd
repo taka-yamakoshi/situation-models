@@ -20,15 +20,15 @@ colorblind_pal()(8)
 # Import data
 
 ```{r,message=FALSE}
-d.layer.raw <- read_csv(here('results/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
+d.layer.raw <- read_csv(here('dataset/combined_effect_ave_layer-query-key-value_multihead_albert-xxlarge-v2.csv')) %>%
   separate(pair_id, into = c('prefix', 'pair_id'))
 
 sent_list <- d.layer.raw %>%
   filter((layer_id==0)&(head_id==0)&(pos_type=='context')) %>%
   select(c("pair_id","original_score","cue_type")) %>%
   pivot_wider(names_from="cue_type",values_from="original_score") %>%
-  mutate(group_score=str_c(context,verb,sep="-")) %>%
-  filter(group_score=="TRUE-TRUE") %>%
+  mutate(group_score=str_c(context,verb,context_verb,sep="-")) %>% 
+  filter(group_score=="TRUE-TRUE-TRUE") %>%
   pull("pair_id")
 ```
 
@@ -63,7 +63,13 @@ d.layer <- d.layer.raw %>%
   mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
   mutate(cue_type=factor(cue_type,levels=c('context','verb','context+verb'))) %>%
   mutate(pos_type=factor(pos_type,levels=c('context','verb','options','masks','rest'))) %>%
-  mutate(layer_id = layer_id+1)
+  mutate(layer_id = layer_id+1) %>%
+  mutate(original_2 = log(1/exp(original_2)),
+       interv_2 = log(1/exp(interv_2))) %>%
+  mutate(effect_1_normed = (exp(original_1) - exp(interv_1))/exp(original_1),
+        effect_2_normed = (exp(original_2) - exp(interv_2))/exp(original_2),
+        effect_ave = (effect_1_normed + effect_2_normed)/2)
+
 ```
 
 ## Main plot for correctly predicted cases
@@ -76,14 +82,14 @@ d.layer %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
   ggplot(aes(x = layer_id, y = empirical_stat, fill = pos_type, color = pos_type, group = pos_type)) +
     geom_line(size=1.2,position = position_dodge(width = 0.4)) +
-    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
+    #geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
     labs(x = 'Layer', y ='Effect of intervention') +
     geom_hline(yintercept=0) +
-    facet_wrap(~ cue_type, scales="free_y") +
+    facet_wrap(~ cue_type) +
     theme(aspect.ratio = 2,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=16),axis.text.y=element_text(size=16), axis.title=element_text(size=18),
           strip.text=element_text(size=16), legend.text=element_text(size=16)) 
