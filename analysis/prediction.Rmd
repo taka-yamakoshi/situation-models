@@ -25,16 +25,12 @@ d.prediction <- read_csv(here('results/prediction/combined/combined.csv')) %>%
 ```
 
 ```{r}
-d.prediction %>% 
-  mutate(strict=(ave_1>0)&(ave_2<0),weak=ave_1>ave_2) %>%
+d.prediction.score <- d.prediction %>% 
+  mutate(strict=(ave_1>0)&(ave_2<0),weak=ave_1>ave_2)
+d.prediction.score %>%
   group_by(model,cue_type) %>% 
   summarize(strict_acc=mean(strict),weak_acc=mean(weak)) %>%
-  filter(model=='gpt2-large')
-```
-
-# Weaker Metric
-```{r}
-
+  filter(model=='albert-xxlarge-v2')
 ```
 
 # Sanity Check
@@ -56,4 +52,131 @@ d.models %>%
   group_by(cue_type,model) %>%
   summarize(acc=mean(original_score))
 
+```
+
+
+# Embedding model
+```{r,message=FALSE}
+d.prediction.emb <- 
+  bind_rows(read_csv(here('results/prediction/combined_original_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              mutate(cue_type='context'),
+            read_csv(here('results/prediction/combined_control_mask_context_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              mutate(cue_type='verb'),
+            read_csv(here('results/prediction/combined_control_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              mutate(cue_type='context+verb'))
+```
+
+```{r}
+d.prediction.emb.score <- d.prediction.emb %>%
+  pivot_wider(names_from='sent_id', values_from = c('pred'), names_prefix = 'pred_') %>%
+  mutate(strict=(pred_1>0)&(pred_2<0)) %>%
+  mutate(weak=pred_1>pred_2)
+d.prediction.emb.score %>%
+  group_by(cue_type,layer_id,metric,baseline) %>%
+  summarize(strict_acc=mean(strict),weak_acc=mean(weak)) %>%
+  filter(layer_id==0) %>%
+  filter(cue_type=='context+verb') %>%
+  filter(baseline=='context')
+```
+
+```{r}
+bind_rows(d.prediction.emb.score %>% 
+            filter(layer_id==0) %>%
+            select(cue_type,pair_id,strict_dist) %>%
+            mutate(dataset=if_else(str_length(pair_id)>10,'winogrande','superglue')) %>%
+            mutate(pred_type='embd') %>%
+            rename(strict=strict_dist),
+          d.prediction.score %>%
+            filter((model=='albert-xxlarge-v2')&(cue_type %in% c('context','verb','context+verb'))) %>%
+            select(cue_type,pair_id,strict) %>%
+            mutate(dataset=if_else(str_length(pair_id)>10,'winogrande','superglue')) %>%
+            mutate(pred_type='mask')) %>%
+  pivot_wider(names_from = pred_type, values_from = strict) %>%
+  mutate(match=embd&mask) %>%
+  filter(mask) %>%
+  group_by(dataset,cue_type) %>%
+  summarize(match_sum=sum(match),match_mean=mean(match))
+```
+
+```{r,message=FALSE}
+d.prediction.emb <- 
+  read_csv(here('results/prediction/winogrande_xl_original_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              mutate(dataset='winogrande',strategy='emb')
+```
+
+```{r}
+d.prediction.emb.winogrande.score <- d.prediction.emb.winogrande %>%
+  pivot_wider(names_from='sent_id', values_from = c('pred'), names_prefix = 'pred_') %>%
+  mutate(strict=(pred_1>0)&(pred_2<0)) %>%
+  mutate(weak=pred_1>pred_2)
+d.prediction.emb.winogrande.score %>%
+  group_by(layer_id,metric) %>%
+  summarize(strict_acc=mean(strict),weak_acc=mean(weak)) %>%
+  filter(layer_id==0)
+```
+
+```{r,message=FALSE}
+d.prediction.winogrande <- 
+  read_csv(here('results/prediction/winogrande_xl_original_prediction_albert-xxlarge-v2.csv')) %>%
+  mutate(size='xl',strategy='mask',layer_id=0)
+```
+
+```{r}
+d.prediction.winogrande.score <- d.prediction.winogrande %>%
+  mutate(strict=(ave_1>0)&(ave_2<0)) %>%
+  mutate(weak=ave_1>ave_2)
+d.prediction.winogrande.score %>%
+  group_by(size) %>%
+  summarize(strict_acc=mean(strict),weak_acc=mean(weak))
+```
+
+# Compare embedding probe with mask prediction
+```{r,message=FALSE}
+d.prediction.emb <-
+  bind_rows(read_csv(here('results/prediction/winogrande_xl_original_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              select(c('pair_id','layer_id','sent_id','metric','baseline','pred')) %>%
+              filter((layer_id==0)&(baseline=='context')) %>%
+              mutate(strategy='emb',dataset='winogrande'),
+            read_csv(here('results/prediction/combined_original_prediction_emb_albert-xxlarge-v2.csv')) %>%
+              select(c('pair_id','layer_id','sent_id','metric','baseline','pred')) %>%
+              filter((layer_id==0)&(baseline=='context')) %>%
+              mutate(strategy='emb',dataset='combined')) %>%
+  pivot_wider(names_from='sent_id', values_from = c('pred'), names_prefix = 'pred_') %>%
+  mutate(strict=(pred_1>0)&(pred_2<0)) %>%
+  mutate(weak=pred_1>pred_2) %>%
+  select(-c('pred_1','pred_2','layer_id','baseline'))
+```
+
+```{r,message=FALSE}
+d.prediction.mask <-
+  bind_rows(read_csv(here('results/prediction/winogrande_xl_original_prediction_albert-xxlarge-v2.csv')) %>%
+              select('pair_id','ave_1','ave_2') %>%
+              mutate(strategy='mask',dataset='winogrande'),
+            read_csv(here('results/prediction/combined/combined.csv')) %>%
+              filter((cue_type=='context')&(model=='albert-xxlarge-v2')) %>%
+              select(-c('model','cue_type')) %>%
+              mutate(strategy='mask',dataset='combined')) %>%
+  mutate(strict=(ave_1>0)&(ave_2<0)) %>%
+  mutate(weak=ave_1>ave_2) %>%
+  select(-c('ave_1','ave_2')) %>%
+  mutate(metric='pred')
+```
+
+```{r}
+d.prediction <- 
+  bind_rows(d.prediction.emb,d.prediction.mask)
+d.prediction %>%
+  group_by(dataset,strategy,metric) %>%
+  summarize(strict_acc=mean(strict),weak_acc=mean(weak),strict_num=sum(strict),weak_num=sum(weak))
+```
+
+```{r}
+d.prediction %>% 
+  filter(metric %in% c('pred','dist')) %>% 
+  select(-c('metric','weak')) %>%
+  pivot_wider(names_from = strategy, values_from = strict) %>%
+  mutate(match=emb&mask) %>%
+  filter(mask) %>%
+  group_by(dataset) %>%
+  summarize(num_matches=sum(match),ave_matches=mean(match),all=sum(mask))
 ```
