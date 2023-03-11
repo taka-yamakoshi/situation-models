@@ -10,6 +10,8 @@ import difflib
 import spacy
 import os
 
+from transformers import AlbertTokenizer
+
 def FindWord(sent,phrase):
     split_sent = sent.split(' ')
     split_phrase = phrase.split(' ')
@@ -134,6 +136,11 @@ def FindVerb(nlp,sent,pron,pron_word_id):
         sent_before_verb = doc[:verb_id].text
         return len(sent_before_verb.split(' ')),doc[verb_id]
 
+def MatchNumTokens(sent_1,sent_2,tokenizer):
+    tokenized_sent_1 = tokenizer(sent_1).input_ids
+    tokenized_sent_2 = tokenizer(sent_2).input_ids
+    return len(tokenized_sent_1)==len(tokenized_sent_2)
+
 if __name__=='__main__':
     np.random.seed(seed=2021)
     parser = argparse.ArgumentParser()
@@ -149,6 +156,7 @@ if __name__=='__main__':
         verb_id = ''
 
     nlp = spacy.load('en_core_web_lg')
+    tokenizer = AlbertTokenizer.from_pretrained('albert-xxlarge-v2')
 
     with open(f'winogrande_1.1/train_{args.size}.jsonl','r') as f:
         file_trn = f.readlines()
@@ -255,6 +263,12 @@ if __name__=='__main__':
         num_empty_other_words = 0
         num_invalid_other_words = 0
         num_invalid_punct = 0
+        num_mismatched_num_tokens = 0
+        num_complete_pairs = 0
+        num_no_verbs = 0
+        num_verb_context_overlap = 0
+        num_inconsistent_verbs = 0
+        num_invalid_verb_tags = 0
         for key,value in wsc_data.items():
             if len(value)!=2:
                 num_invalid_groups += 1
@@ -296,6 +310,10 @@ if __name__=='__main__':
                     schema_data_all[f'option_1_word_id_{sent_id}'] = schema_data['option_1_word_id']
                     schema_data_all[f'option_2_word_id_{sent_id}'] = schema_data['option_2_word_id']
 
+                if not MatchNumTokens(schema_data_all['sent_1'],schema_data_all['sent_2'],tokenizer):
+                    num_mismatched_num_tokens += 1
+                    continue
+
                 invalid_punct_1 = np.sum([word.startswith('.') or word.startswith(',') for word in schema_data_all['sent_1'].split(' ')])
                 invalid_punct_2 = np.sum([word.startswith('.') or word.startswith(',') for word in schema_data_all['sent_2'].split(' ')])
                 if invalid_punct_1 > 0 or invalid_punct_2 > 0:
@@ -305,6 +323,7 @@ if __name__=='__main__':
                 # Identify the context word
                 context_word_id,context_1,context_2 = FindContext(schema_data_all['sent_1'],schema_data_all['sent_2'])
                 if context_1=="" or context_2=="":
+                    #print(schema_data_all)
                     num_invalid_contexts += 1
                     continue
                 #if len(context_1.split(' '))>5 or len(context_2.split(' '))>5:
@@ -325,7 +344,7 @@ if __name__=='__main__':
                 schema_data_all['context_1'] = context_1.strip(' ,.;:!?')
                 schema_data_all['context_2'] = context_2.strip(' ,.;:!?')
                 schema_data_all['context_word_id'] = context_word_id
-                print(schema_data_all['context_1'],schema_data_all['context_2'])
+                #print(schema_data_all['context_1'],schema_data_all['context_2'])
 
                 context_1_pos = FindPOS(nlp,schema_data_all['sent_1'],
                                         schema_data_all['context_1'],schema_data_all['context_word_id'])
@@ -351,15 +370,19 @@ if __name__=='__main__':
                                                         schema_data_all[f'pron_2'],
                                                         schema_data_all[f'pron_word_id_2'])
                     if verb_1 is None or verb_2 is None:
+                        num_no_verbs += 1
                         continue
 
                     if schema_data_all['context_word_id'] in [verb_word_id_1,verb_word_id_2]:
+                        num_verb_context_overlap += 1
                         continue
 
                     if not (verb_1.text==verb_2.text and verb_1.pos_==verb_2.pos_ and verb_1.tag_==verb_2.tag_):
+                        num_inconsistent_verbs += 1
                         continue
 
                     if verb_1.tag_ not in ['VBP','VBZ','BES','MD']:
+                        num_invalid_verb_tags += 1
                         continue
 
                     schema_data_all['verb_1'] = verb_1.text
@@ -410,6 +433,7 @@ if __name__=='__main__':
                 schema_data_all[f'other'] = other_word
 
                 writer.writerow([schema_data_all[feature] for feature in head])
+                num_complete_pairs += 1
 
         print(f'{len(loaded_data)} lines extracted from the jsonl file')
         print(f'{len(wsc_data)} groups extracted from the jsonl file')
@@ -417,13 +441,23 @@ if __name__=='__main__':
         print(f'---invalid match for option_1:{num_invalid_matches_option_1}')
         print(f'---invalid match for option_2:{num_invalid_matches_option_2}')
         print(f'---total invalid matches:{num_invalid_matches}')
-
+        print('--------------------')
         print(f'# invalid groups: {num_invalid_groups}')
         print(f'# empty: {num_empty}')
         print(f'# sinlges: {num_singles}')
         print(f'# triples or more: {num_triples_or_more}')
+        print('--------------------')
         print(f'# invalid answers: {num_invalid_answers}')
+        print(f'# mismatched num tokens: {num_mismatched_num_tokens}')
+        print(f'# invalid punct: {num_invalid_punct}')
         print(f'# invalid contexts: {num_invalid_contexts}')
+        print('--------------------')
+        print(f'# no verbs: {num_no_verbs}')
+        print(f'# verb context overlap: {num_verb_context_overlap}')
+        print(f'# inconsistent verb: {num_inconsistent_verbs}')
+        print(f'# invalid verb tags: {num_invalid_verb_tags}')
+        print('--------------------')
         print(f'# empty other words: {num_empty_other_words}')
         print(f'# invalid other words: {num_invalid_other_words}')
-        print(f'# invalid punct: {num_invalid_punct}')
+        print('--------------------')
+        print(f'num complete pairs: {num_complete_pairs}')

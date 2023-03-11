@@ -12,7 +12,7 @@ def loaded_df_preprocess(file_path,show_last_mod=False,show_score=False,cols=Non
     loaded_df = pd.read_csv(file_path)
     if show_score:
         print(loaded_df.loc[lambda d: (d['interv_type']=='original')&(d['layer_id']==0)&(d['head_id']==0)].score.mean())
-    loaded_df = loaded_df.loc[lambda d:d['interv_type']=='interv']
+    #loaded_df = loaded_df.loc[lambda d:d['interv_type']=='interv']
     if cols is None:
         cols = ['pair_id','sent_1','sent_2','layer_id','head_id','original_score',
                 'effect_ave','masks-option-diff_effect_47',
@@ -29,7 +29,7 @@ def set_up_args(rep_type,model_id):
             cue_type_list = ['context']
         else:
             pos_types = ['options','context','masks','verb','period','cls-sep','rest']
-            cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2']
+            cue_type_list = ['context'] #,'verb','context_verb','synonym_1','synonym_2']
         cascade, multihead = False, True
         choose_head_0 = True
     elif rep_type == 'z_rep_concat':
@@ -75,8 +75,8 @@ if __name__ =='__main__':
     dataset = 'combined'
     size = 'xl'
     metric = 'effect_ave'
-    rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
-    #rep_types = ['layer-query-key-value']
+    #rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
+    rep_types = ['layer-query-key-value']
     models = ['albert-xxlarge-v2']
     #models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
     #'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
@@ -104,11 +104,14 @@ if __name__ =='__main__':
                     file_name = f'{os.environ.get("MY_DATA_PATH")}/intervention/{dataset_name}_{stimuli}{mask_context_id}_intervention_swap_'\
                                     +f'{pos_type}_{rep_type}_{model}_layer_all_head_all{cascade_id}{multihead_id}.csv'
                     loaded_df = loaded_df_preprocess(file_name,show_last_mod=True,
-                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,
-                                                     'original_1','original_2','interv_1','interv_2','effect_1','effect_2'])
+                                                     cols=['pair_id','sent_1','sent_2','layer_id','head_id','original_score',metric,'interv_type',
+                                                     'original_1','original_2','interv_1','interv_2','effect_1','effect_2',
+                                                     *[f'logprob_ave_option_{option_id+1}_sent_{sent_id+1}' for option_id in range(2) for sent_id in range(2)],
+                                                     *[f'logprob_sum_option_{option_id+1}_sent_{sent_id+1}' for option_id in range(2) for sent_id in range(2)]])
                     if choose_head_0:
                         loaded_df = loaded_df.loc[lambda d: d['head_id']==0]
                     loaded_df = loaded_df.assign(model=model,cue_type=cue_type,pos_type=pos_type,rep_type=f'{rep_type}{cascade_id}{multihead_id}')
                     df = pd.concat([df,loaded_df])
         df.to_csv(f'{os.environ.get("MY_DATA_PATH")}/intervention/combined/{dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv',index=False)
+        print(f'written out to {dataset}_{metric}_{rep_type}{cascade_id}{multihead_id}_{model_id}.csv')
         print('\n')
