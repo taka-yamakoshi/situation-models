@@ -113,8 +113,12 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
 
     input_sent = tokenizer(sent,return_tensors='pt')['input_ids']
     pron_start_id,pron_end_id = align_tokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
-    option_1_start_id,option_1_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_1,option_1_word_id)
-    option_2_start_id,option_2_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_2,option_2_word_id)
+    if args.stimuli!='single':
+        option_1_start_id,option_1_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_1,option_1_word_id)
+        option_2_start_id,option_2_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_2,option_2_word_id)
+    else:
+        option_1_start_id,option_1_end_id = 0,0
+        option_2_start_id,option_2_end_id = 0,0
     context_start_id,context_end_id = align_tokens(args,'context',tokenizer,sent,input_sent,context,context_word_id)
     if 'verb' in args.stimuli or args.dataset=='combined':
         verb_start_id,verb_end_id = align_tokens(args,'verb',tokenizer,sent,input_sent,verb,verb_word_id)
@@ -122,8 +126,16 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
         verb_start_id,verb_end_id = 0,0
     period_id = align_tokens(args,'period',tokenizer,sent,input_sent,None,None)
 
-    option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
-                            input_sent[0][option_2_start_id:option_2_end_id]]
+    if args.stimuli!='single':
+        option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
+                                input_sent[0][option_2_start_id:option_2_end_id]]
+    else:
+        tokenized_option_1 = tokenizer(option_1,return_tensors='pt')['input_ids']
+        tokenized_option_2 = tokenizer(option_2,return_tensors='pt')['input_ids']
+        if 'gpt2' in args.model:
+            option_tokens_list = [tokenized_option_1[0],tokenized_option_2[0]]
+        else:
+            option_tokens_list = [tokenized_option_1[0][1:-1],tokenized_option_2[0][1:-1]]
     option_ids = [np.array([option_1_start_id,option_1_end_id]),
                     np.array([option_2_start_id,option_2_end_id])]
     options = [option_1,option_2]
@@ -218,8 +230,9 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
         return outputs, output_token_ids, option_tokens_list, masked_sents
 
 def check_re_alignment(sent_id,tokenizer,mask_id,masked_sent,options,context,verb,aligned_token_ids,mask_context,context_length,mask_length,masked_option,args,output_for_attn):
-    check_alignment(args,'option',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
-    check_alignment(args,'option',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
+    if args.stimuli!='single':
+        check_alignment(args,'option',tokenizer,masked_sent,options[0],*aligned_token_ids['option_1'])
+        check_alignment(args,'option',tokenizer,masked_sent,options[1],*aligned_token_ids['option_2'])
     if 'verb' in args.stimuli or args.dataset=='combined':
         check_alignment(args,'verb',tokenizer,masked_sent,verb,*aligned_token_ids['verb'])
     if mask_context:
