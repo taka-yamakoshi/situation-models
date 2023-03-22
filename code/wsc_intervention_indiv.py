@@ -78,12 +78,17 @@ if __name__=='__main__':
         writer.writerow(head+['interv_type','rep','pos','cascade','multihead',
                                 'layer_id','head_id','original_score','score','effect_ave',
                                 'original_1','original_2','interv_1','interv_2','effect_1','effect_2',
+                                *[f'logprob_ave_option_{option_id+1}_sent_1' for option_id in range(2)],
+                                *[f'logprob_ave_option_{option_id+1}_sent_2' for option_id in range(2)],
+                                *[f'logprob_sum_option_{option_id+1}_sent_1' for option_id in range(2)],
+                                *[f'logprob_sum_option_{option_id+1}_sent_2' for option_id in range(2)],
                                 *[f'masks-option-diff_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-option-diff_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-dist_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'masks-qry-cos_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'options-key-dist_effect_{head_id}' for head_id in range(args.num_heads)],
                                 *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
+
         line = text[pair_ids.index(args.pair_id)]
         seq_len = calc_seq_len(head,line,tokenizer)
 
@@ -97,19 +102,19 @@ if __name__=='__main__':
                 if type(results) is str:
                     raise NotImplementedError("Sequence lengths do not match")
                 else:
-                    original_1,original_2,original_attn_1,original_attn_2,original_score = evaluate_results(results['original'],0,args)
+                    original_results = evaluate_results(results['original'],0,args)
 
                     original_qry_dist,original_qry_cos = evaluate_QKV('qry',results['original'],results['original'],0,0,args)
                     original_key_dist,original_key_cos = evaluate_QKV('key',results['original'],results['original'],0,0,args)
                     for layer_id in range(args.num_layers):
                         result_dict = results[f'layer_{layer_id}']
                         for head_id in range(args.num_heads):
-                            interv_1,interv_2,interv_attn_1,interv_attn_2,interv_score = evaluate_results(result_dict,head_id,args)
+                            interv_results = evaluate_results(result_dict,head_id,args)
 
-                            effect_1 = original_1-interv_1
-                            effect_2 = interv_2-original_2
-                            effect_attn_1 = original_attn_1-interv_attn_1
-                            effect_attn_2 = interv_attn_2-original_attn_2
+                            effect_1 = original_results['llr_1']-interv_results['llr_1']
+                            effect_2 = interv_results['llr_2']-original_results['llr_2']
+                            effect_attn_1 = original_results['attn_1']-interv_results['attn_1']
+                            effect_attn_2 = interv_results['attn_2']-original_results['attn_2']
 
                             interv_qry_dist,interv_qry_cos = evaluate_QKV('qry',result_dict,results['original'],head_id,0,args)
                             interv_key_dist,interv_key_cos = evaluate_QKV('key',result_dict,results['original'],head_id,0,args)
@@ -117,18 +122,28 @@ if __name__=='__main__':
                             assert len(interv_key_dist)==args.num_heads and len(interv_key_cos)==args.num_heads
 
                             writer.writerow(line+['interv',rep,pos,cascade_id,multihead_id,
-                                                    layer_id,head_id,original_score,interv_score,(effect_1+effect_2)/2,
-                                                    original_1,original_2,interv_1,interv_2,effect_1,effect_2,
-                                                    *list((interv_attn_1-interv_attn_2)/2),
+                                                    layer_id,head_id,original_results['score'],interv_results['score'],(effect_1+effect_2)/2,
+                                                    original_results['llr_1'],original_results['llr_2'],
+                                                    interv_results['llr_1'],interv_results['llr_2'],effect_1,effect_2,
+                                                    *[interv_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                    *[interv_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                    *[interv_results[f'logprob_sum_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                    *[interv_results[f'logprob_sum_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                    *list((interv_results['attn_1']-interv_results['attn_2'])/2),
                                                     *list((effect_attn_1+effect_attn_2)/2),
                                                     *list(original_qry_dist-interv_qry_dist),
                                                     *list(interv_qry_cos-original_qry_cos),
                                                     *list(original_key_dist-interv_key_dist),
                                                     *list(interv_key_cos-original_key_cos)])
                             writer.writerow(line+['original',rep,pos,cascade_id,multihead_id,
-                                                    layer_id,head_id,original_score,original_score,0.0,
-                                                    original_1,original_2,original_1,original_2,0.0,0.0,
-                                                    *list((original_attn_1-original_attn_2)/2),
+                                                    layer_id,head_id,original_results['score'],original_results['score'],0.0,
+                                                    original_results['llr_1'],original_results['llr_2'],
+                                                    original_results['llr_1'],original_results['llr_2'],0.0,0.0,
+                                                    *[original_results[f'logprob_ave_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                    *[original_results[f'logprob_ave_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                    *[original_results[f'logprob_sum_option_{option_id+1}_sent_1'] for option_id in range(2)],
+                                                    *[original_results[f'logprob_sum_option_{option_id+1}_sent_2'] for option_id in range(2)],
+                                                    *list((original_results['attn_1']-original_results['attn_2'])/2),
                                                     *[0.0 for _ in range(args.num_heads)],
                                                     *[0.0 for _ in range(args.num_heads)],
                                                     *[0.0 for _ in range(args.num_heads)],
