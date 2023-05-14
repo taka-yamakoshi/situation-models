@@ -29,13 +29,13 @@ def set_up_args(rep_type,model_id):
             cue_type_list = ['context']
         else:
             pos_types = ['options','context','masks','verb','period','cls-sep','rest']
-            cue_type_list = ['context'] #,'verb','context_verb','synonym_1','synonym_2']
+            cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2']
         cascade, multihead = False, True
         choose_head_0 = True
     elif rep_type == 'z_rep_concat':
         pos_types = ['options','masks','rest']
         cascade, multihead = True, True
-        cue_type_list = ['context','verb','context_verb']
+        cue_type_list = ['context','verb'] #,'context_verb']
         choose_head_0 = True
     elif rep_type in ['z_rep_indiv','query','key','value']:
         pos_types = ['options','context','masks','verb','period','cls-sep','rest']
@@ -75,8 +75,8 @@ if __name__ =='__main__':
     dataset = 'combined'
     size = 'xl'
     metric = 'effect_ave'
-    #rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value','attention','q_and_k']
-    rep_types = ['layer-query-key-value']
+    rep_types = ['layer-query-key-value','z_rep_concat','z_rep_indiv','query','key','value'] #,'attention','q_and_k']
+    #rep_types = ['layer-query-key-value']
     models = ['albert-xxlarge-v2']
     #models = ['bert-base-uncased','bert-large-cased','roberta-base','roberta-large',
     #'albert-base-v2','albert-large-v2','albert-xlarge-v2','albert-xxlarge-v2']
