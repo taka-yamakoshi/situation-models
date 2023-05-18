@@ -29,7 +29,7 @@ def set_up_args(rep_type,model_id):
             cue_type_list = ['context']
         else:
             pos_types = ['options','context','masks','verb','period','cls-sep','rest']
-            cue_type_list = ['context','verb','context_verb','synonym_1','synonym_2']
+            cue_type_list = ['context','verb','synonym_1','synonym_2']
         cascade, multihead = False, True
         choose_head_0 = True
     elif rep_type == 'z_rep_concat':
@@ -38,7 +38,7 @@ def set_up_args(rep_type,model_id):
         cue_type_list = ['context','verb'] #,'context_verb']
         choose_head_0 = True
     elif rep_type in ['z_rep_indiv','query','key','value']:
-        pos_types = ['options','context','masks','verb','period','cls-sep','rest']
+        pos_types = ['options','context','masks','verb','rest']
         cascade, multihead = False, False
         cue_type_list = ['context','verb']
         choose_head_0 = False
