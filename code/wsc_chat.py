@@ -21,10 +21,10 @@ def calc_continuation(prompt):
         try:
             response = openai.ChatCompletion.create(
                 model      = args.model,
-                messages=[
-                        {"role": "system", "content": "You are a helpful assistant, who can correctly disambiguate a pronoun based on the context."},
+                messages   = [
+                        {"role": "system", "content": "You are a helpful assistant that can correctly answer which noun phrase a pronoun refers to based on the context."},
                         {"role": "user", "content": prompt}
-                ]
+                        ],
                 temperature = 1,
                 )
             pass_flag = True
