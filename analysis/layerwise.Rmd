@@ -156,6 +156,7 @@ d.layer.raw %>%
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
     labs(x = 'Layer', y ='Effect') +
     geom_hline(yintercept=0) +
     facet_wrap(~ cue_type, scales="free_y") +
@@ -186,6 +187,7 @@ d.layer.raw %>%
     theme_few() +
     scale_fill_manual(values=c("#aeaeae","#1f1f1f")) +
     scale_color_manual(values=c("#aeaeae","#1f1f1f")) +
+    scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
     labs(x = 'Layer', y ='Effect') +
     geom_hline(yintercept=0) +
     facet_wrap(~ cue_type, scales="free_y") +
@@ -214,6 +216,7 @@ d.layer.raw %>%
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
     labs(x = 'Layer', y ='Effect') +
     geom_hline(yintercept=0) +
     guides(color=guide_legend(ncol=1)) +
@@ -253,6 +256,7 @@ d.zrep %>%
     theme_few() +
     scale_color_manual(values=c("#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#56B4E9","#009E73","#000000")) +
+    scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
     labs(x = 'Layer', y ='Effect') +
     facet_wrap( ~ cue_type, scales="free_y") +
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
@@ -282,7 +286,7 @@ d.models %>%
   filter(pair_id %in% sent_list) %>%
   group_by(model, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
-  ggplot(aes(x = layer_id, y = empirical_stat, color = pos_type, group = pos_type, fill = pos_type)) +
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type, fill = pos_type)) +
     geom_hline(yintercept=0) +
     geom_line(linewidth=1.2) +
     geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
