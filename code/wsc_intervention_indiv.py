@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import argparse
 import json
 import csv
-from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model, get_reps, extract_QKV, evaluate_QKV, align_tokens
+from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model, get_reps, extract_QKV, evaluate_QKV, align_tokens, mask_out
 from model_skeleton import skeleton_model, extract_attn_layer
 from wsc_attention import evaluate_attention,convert_to_numpy
 from wsc_intervention import apply_interventions, evaluate_results
@@ -108,9 +108,9 @@ if __name__=='__main__':
         line = text[pair_ids.index(args.pair_id)]
         seq_len = calc_seq_len(head,line,args,tokenizer,mask_id)
 
-        rep_types = ['layer-query-key-value','z_rep','value']
-        cascade_types = [False,False,False]
-        multihead_types = [True,False,False]
+        rep_types = ['layer-query-key-value','z_rep','z_rep','value']
+        cascade_types = [False,True,False,False]
+        multihead_types = [True,True,False,False]
         for rep,cascade_id,multihead_id in zip(rep_types, cascade_types, multihead_types):
             args.cascade, args.multihead = cascade_id, multihead_id
             for pos in range(seq_len):
