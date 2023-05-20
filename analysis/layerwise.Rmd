@@ -72,6 +72,7 @@ calc_effect <- function(data) {
          effect_1_2=(prob_1_2_interv-prob_1_2_original), #/prob_1_2_interv,
          effect_2_2=(prob_2_2_original-prob_2_2_interv)) %>% #/prob_2_2_original) %>%
   mutate(effect_ave = (effect_1_1+effect_2_1+effect_1_2+effect_2_2)/4)
+  #mutate(effect_ave = (effect_1_1+effect_2_2)/2)
   return(new_data)
 }
 ```
@@ -107,7 +108,7 @@ d.layer %>%
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     scale_x_continuous(breaks = c(1,3,5,7,9,11)) +
-    labs(x = 'Layer', y ='Effect of intervention') +
+    labs(x = 'Layer', y ='effect of intervention') +
     geom_hline(yintercept=0) +
     facet_wrap(~ cue_type, scales = "free") +
     theme(aspect.ratio = 2,legend.position = 'right', legend.title = element_blank(), 
@@ -194,7 +195,7 @@ d.layer.raw %>%
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
           strip.text=element_text(size=16), legend.text=element_text(size=16))
-ggsave('layerwise/layer_period_cls-sep.pdf', units = 'in', width = 9, height = 4)
+ggsave('layerwise/layer_period_cls-sep.pdf', units = 'in', width = 6, height = 4)
 ```
 
 # Supp plot for synonym conditoin
