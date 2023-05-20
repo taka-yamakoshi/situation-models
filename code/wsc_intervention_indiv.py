@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import argparse
 import json
 import csv
-from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model, get_reps, extract_QKV, evaluate_QKV
+from wsc_utils import calc_outputs, evaluate_predictions, load_dataset, load_model, get_reps, extract_QKV, evaluate_QKV, align_tokens
 from model_skeleton import skeleton_model, extract_attn_layer
 from wsc_attention import evaluate_attention,convert_to_numpy
 from wsc_intervention import apply_interventions, evaluate_results
@@ -15,12 +15,28 @@ import time
 import math
 import os
 
-def calc_seq_len(head,line,tokenizer):
-    sent_1,sent_2 = line[head.index('sent_1')],line[head.index('sent_2')]
-    tokenized_sent_1 = tokenizer(sent_1,return_tensors='pt')['input_ids']
-    tokenized_sent_2 = tokenizer(sent_1,return_tensors='pt')['input_ids']
-    assert tokenized_sent_1.shape[1]==tokenized_sent_2.shape[1]
-    return tokenized_sent_1.shape[1]
+def calc_seq_len(head,line,args,tokenizer,mask_id):
+    seq_len_list = []
+    option_1 = line[head.index(f'option_1')]
+    option_2 = line[head.index(f'option_2')]
+    for sent_id in [1,2]:
+        sent = line[head.index(f'sent_{sent_id}')]
+        pron = line[head.index(f'pron_{sent_id}')]
+        pron_word_id = int(line[head.index(f'pron_word_id_{sent_id}')])
+        option_1_word_id = int(line[head.index(f'option_1_word_id_{sent_id}')])
+        option_2_word_id = int(line[head.index(f'option_2_word_id_{sent_id}')])
+        input_sent = tokenizer(sent,return_tensors='pt')['input_ids']
+
+        option_1_start_id,option_1_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_1,option_1_word_id)
+        option_2_start_id,option_2_end_id = align_tokens(args,'option',tokenizer,sent,input_sent,option_2,option_2_word_id)
+        option_tokens_list = [input_sent[0][option_1_start_id:option_1_end_id],
+                                input_sent[0][option_2_start_id:option_2_end_id]]
+        pron_start_id,pron_end_id = align_tokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
+        masked_sents = mask_out(args.model, mask_id, input_sent, pron_start_id, pron_end_id, option_tokens_list)
+        assert len(masked_sents[0])==len(masked_sents[1])
+        seq_len_list.append(len(masked_sents[0]))
+    assert seq_len_list[0]==seq_len_list[1]
+    return seq_len_list[0]
 
 if __name__=='__main__':
     start = time.time()
@@ -90,7 +106,7 @@ if __name__=='__main__':
                                 *[f'options-key-cos_effect_{head_id}' for head_id in range(args.num_heads)]])
 
         line = text[pair_ids.index(args.pair_id)]
-        seq_len = calc_seq_len(head,line,tokenizer)
+        seq_len = calc_seq_len(head,line,args,tokenizer,mask_id)
 
         rep_types = ['layer-query-key-value','z_rep','value']
         cascade_types = [False,False,False]

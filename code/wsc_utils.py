@@ -91,6 +91,19 @@ def load_model(args):
 
     return model, tokenizer, mask_id, args
 
+def mask_out(model_name, mask_id, input_sent, pron_start_id, pron_end_id, option_tokens_list):
+    if 'bert' in model_name:
+        masked_sents = [torch.cat([input_sent[0][:pron_start_id],
+                                   torch.tensor([mask_id for token in option_tokens_list[option_id]]),
+                                   input_sent[0][pron_end_id:]]).unsqueeze(0)
+                        for option_id in range(2)]
+    elif 'gpt2' in model_name:
+        masked_sents = [torch.cat([input_sent[0][:pron_start_id],
+                                   option_tokens_list[option_id].clone(),
+                                   input_sent[0][pron_end_id:]]).unsqueeze(0)
+                        for option_id in range(2)]
+    return masked_sents
+
 def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=False,output_for_attn=False,use_skeleton=False):
     # load data from a line in csv
     sent = line[head.index(f'sent_{sent_id}')]
@@ -163,17 +176,7 @@ def calc_outputs(head,line,sent_id,model,tokenizer,mask_id,args,mask_context=Fal
                 for default_attn,attn in zip(default_output[2],output[2]):
                     assert torch.all(default_attn == attn)
     else:
-        if 'bert' in args.model:
-            masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
-                                       torch.tensor([mask_id for token in option_tokens_list[option_id]]),
-                                       input_sent_new[0][pron_end_id:]]).unsqueeze(0)
-                            for option_id in range(2)]
-        elif 'gpt2' in args.model:
-            masked_sents = [torch.cat([input_sent_new[0][:pron_start_id],
-                                       option_tokens_list[option_id].clone(),
-                                       input_sent_new[0][pron_end_id:]]).unsqueeze(0)
-                            for option_id in range(2)]
-
+        masked_sents = mask_out(args.model, mask_id, input_sent_new, pron_start_id, pron_end_id, option_tokens_list)
         with torch.no_grad():
             if not use_skeleton:
                 outputs = [model(masked_sent.to(args.device)) for masked_sent in masked_sents]
