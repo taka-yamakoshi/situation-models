@@ -23,14 +23,14 @@ colorblind_pal()(8)
 
 ```{r,message=FALSE}
 d.zindiv.raw <- read_csv(here('results/combined_effect_ave_z_rep_albert-xxlarge-v2.csv'))
-d.qry.raw <- read_csv(here('results/combined_effect_ave_query_albert-xxlarge-v2.csv'))
+#d.qry.raw <- read_csv(here('results/combined_effect_ave_query_albert-xxlarge-v2.csv'))
 d.key.raw <- read_csv(here('results/combined_effect_ave_key_albert-xxlarge-v2.csv'))
 d.val.raw <- read_csv(here('results/combined_effect_ave_value_albert-xxlarge-v2.csv'))
 ```
 
 ```{r}
 sent_list <- d.zindiv.raw %>%
-  filter((layer_id==0)&(head_id==0)&(pos_type=='context')) %>%
+  filter((layer_id==0)&(head_id==0)&(pos_type=='context')&(interv_type=='original')) %>%
   separate(pair_id, into = c('prefix', 'pair_id')) %>%
   select(c("pair_id","original_score","cue_type")) %>%
   pivot_wider(names_from="cue_type",values_from="original_score") %>%
@@ -48,16 +48,39 @@ preprocess <- function(d) {
     mutate(head_id=head_id+1) %>%
     return()
 }
-d.zindiv <- preprocess(d.zindiv.raw)
-d.qry <- preprocess(d.qry.raw)
-d.key <- preprocess(d.key.raw)
-d.val <- preprocess(d.val.raw)
+
+calc_effect <- function(data) {
+  new_data <- data %>%
+  mutate(prob_1_1=exp(logprob_ave_option_1_sent_1),
+         prob_2_1=exp(logprob_ave_option_2_sent_1),
+         prob_1_2=exp(logprob_ave_option_1_sent_2),
+         prob_2_2=exp(logprob_ave_option_2_sent_2)) %>%
+  select(-c('original_1','original_2','interv_1','interv_2','effect_1','effect_2','effect_ave')) %>%
+  select(-c('logprob_ave_option_1_sent_1','logprob_ave_option_2_sent_1',
+            'logprob_ave_option_1_sent_2','logprob_ave_option_2_sent_2')) %>%
+  select(-c('logprob_sum_option_1_sent_1','logprob_sum_option_2_sent_1',
+            'logprob_sum_option_1_sent_2','logprob_sum_option_2_sent_2')) %>%
+  pivot_wider(names_from='interv_type',values_from=c('prob_1_1','prob_2_1','prob_1_2','prob_2_2')) %>%
+  mutate(effect_1_1=(prob_1_1_original-prob_1_1_interv), #/prob_1_1_original,
+         effect_2_1=(prob_2_1_interv-prob_2_1_original), #/prob_2_1_interv,
+         effect_1_2=(prob_1_2_interv-prob_1_2_original), #/prob_1_2_interv,
+         effect_2_2=(prob_2_2_original-prob_2_2_interv)) %>% #/prob_2_2_original) %>%
+  mutate(effect_ave = (effect_1_1+effect_2_1+effect_1_2+effect_2_2)/4)
+  #mutate(effect_ave = (effect_1_1+effect_2_2)/2)
+  return(new_data)
+}
+```
+```{r}
+d.zindiv <- preprocess(d.zindiv.raw) %>% calc_effect()
+#d.qry <- preprocess(d.qry.raw) %>% calc_effect()
+d.key <- preprocess(d.key.raw) %>% calc_effect()
+d.val <- preprocess(d.val.raw) %>% calc_effect()
 ```
 
 # Count how many heads are involved in this circuit
 
 ```{r}
-p_threshold <- 0.001
+p_threshold <- 0.05
 head_list <- d.zindiv %>%
   filter(cue_type=="context") %>%
   group_by(layer_id, head_id, pos_type) %>%
@@ -147,7 +170,7 @@ tvals.raw <- d.zindiv %>%
               t.val = t.test(effect_ave)$statistic,
               effect = mean(effect_ave)) 
 
-threshold <- 0.005/64/12/3    
+threshold <- 0.01/64/12/3    
 tvals.clean <- tvals.raw %>%
   select(layer_id,head_id,pos_type,p.val,cue_type, effect) %>%
   pivot_wider(names_from = c('cue_type'), values_from = c('p.val', 'effect')) %>%
@@ -194,9 +217,12 @@ ggsave('head-specificity.pdf', units = 'in', width = 5, height = 6)
 ## Make plots
 
 ```{r}
-bar_center <- -0.01
-bar_height <- 0.015
-t.vals.all %>%
+bar_center <- -0.001
+bar_height <- 0.0015
+t.vals.all <- d.headall %>%
+  group_by(cue_type, layer_id, head_id, rep_type, pos_type) %>%
+  summarize(p.val = t.test(effect_ave)$p.value,
+            t.val = t.test(effect_ave)$statistic) %>%
   mutate(p.log=(-log10(p.val))) %>%
   mutate(y = 0) %>%
   mutate(y = replace(y,pos_type==pos_type_list[1],bar_center-4*bar_height)) %>%
@@ -205,10 +231,10 @@ t.vals.all %>%
   mutate(y = replace(y,pos_type==pos_type_list[4],bar_center-bar_height)) %>%
   mutate(y = replace(y,pos_type==pos_type_list[5],bar_center)) %>%
   mutate(alpha = 0) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.05/12/64/7/2),0.4)) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.01/12/64/7/2),0.6)) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.005/12/64/7/2),0.8)) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.001/12/64/7/2),1.0)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.05/12/64/5),0.4)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.01/12/64/5),0.6)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.005/12/64/5),0.8)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.001/12/64/5),1.0)) %>%
   select(cue_type,layer_id,head_id,rep_type,pos_type,y,alpha,p.val)
 write.csv(t.vals.all,file="tvals_all.csv",row.names=FALSE)
 ```
@@ -246,16 +272,14 @@ for (plot_head_id in 1:64) {
                 #aes(alpha=alpha,color="white",fill=pos_type)) +
                 aes(alpha=alpha,fill=pos_type)) +
       geom_line(data = subset(d.head, plot_type == 'line'),
-                aes(color=pos_type),
-                linewidth=1.2,position=position_dodge(width=0.5)) +
-      geom_errorbar(data = subset(d.head, plot_type == 'line'),
-                    aes(ymin=ci_lower, ymax=ci_upper, color=pos_type), 
-                    width=0.8,size=0.8,linetype='solid',position=position_dodge(width=0.5)) +
+                aes(color=pos_type),linewidth=1.2) +
+      geom_ribbon(data = subset(d.head, plot_type == 'line'),
+                    aes(ymin=ci_lower, ymax=ci_upper, fill=pos_type),alpha = 0.2, color=NA,) +
       theme_few() +
       scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
       scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
       scale_alpha(limits = c(0.0, 1.0)) +
-      ylim(-0.08,NA) + 
+      ylim(-0.008,NA) + 
       labs(x = 'Layer', y ='Effect') +
       guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
       facet_grid(plot_type~rep_type,scales = "free_y") +
@@ -266,7 +290,7 @@ for (plot_head_id in 1:64) {
             strip.text.x=element_text(size=16), legend.text=element_text(size=16), strip.text.y=element_blank(),
             axis.line = element_line(colour = "black"),
             panel.border = element_blank(),panel.background = element_blank())
-    ggsave(here(paste0('results/figures/headwise/all/alpha/head_',plot_head_id,'_',plot_cue_type,'.pdf',sep="")), units = 'in', width = 7.5, height = 3.6)
+    ggsave(paste0('headwise/all/alpha/head_',plot_head_id,'_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 7.5, height = 3.6)
   }
 }
 ```
@@ -298,11 +322,14 @@ d.zindiv %>%
     filter(cue_type==plot_cue_type) %>%
     group_by(head_id, layer_id, pos_type) %>%
     tidyboot_mean(effect_ave, nboot = 10) %>%
-    ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+    ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type, fill=pos_type)) +
     geom_hline(yintercept=0) +
-    geom_line(size=0.8,position = position_dodge(width = 0.3)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_line(linewidth=0.8) + 
+    #,position = position_dodge(width = 0.3)) +
+    #geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
     facet_wrap( ~ head_id) +
     theme_few() +
@@ -310,11 +337,9 @@ d.zindiv %>%
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste('supps/zrep_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 16, height = 16)
+ggsave(paste('supps/zrep_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 13.5, height = 16)
 }
 ```
-
-
 
 
 ```{r}
@@ -795,11 +820,14 @@ d.val %>%
   filter(cue_type==plot_cue_type) %>%
   group_by(head_id, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
-  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type, fill = pos_type)) +
     geom_hline(yintercept=0) +
-    geom_line(size=0.8,position = position_dodge(width = 0.3)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_line(linewidth=0.8) + 
+    #,position = position_dodge(width = 0.3)) +
+    #geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
     facet_wrap( ~ head_id) +
     theme_few() +
@@ -807,7 +835,7 @@ d.val %>%
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste('supps/value_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 16, height = 16)
+ggsave(paste('supps/value_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 13.5, height = 16)
 }
 ```
 
@@ -963,11 +991,14 @@ d.qry %>%
   filter(cue_type==plot_cue_type) %>%
   group_by(head_id, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
-  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type, fill=pos_type)) +
     geom_hline(yintercept=0) +
-    geom_line(size=0.8,position = position_dodge(width = 0.3)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_line(size=0.8) +
+    #+,position = position_dodge(width = 0.3)) +
+    #geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
     facet_wrap( ~ head_id) +
     theme_few() +
@@ -975,7 +1006,7 @@ d.qry %>%
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste('supps/query_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 16, height = 16)
+ggsave(paste('supps/query_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 13.5, height = 16)
 }
 ```
 
@@ -989,11 +1020,14 @@ d.key %>%
   filter(cue_type==plot_cue_type) %>%
   group_by(head_id, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
-  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type)) +
+  ggplot(aes(x = as.factor(layer_id), y = empirical_stat, color = pos_type, group = pos_type, fill=pos_type)) +
     geom_hline(yintercept=0) +
-    geom_line(size=0.8,position = position_dodge(width = 0.3)) +
-    geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_line(linewidth=0.8) +
+    #,position = position_dodge(width = 0.3)) +
+    #geom_errorbar(aes(ymin=ci_lower, ymax=ci_upper), width=0.5,size=0.5,linetype='solid',position = position_dodge(width = 0.3)) +
+    geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
     #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
     facet_wrap( ~ head_id) +
     theme_few() +
@@ -1001,6 +1035,6 @@ d.key %>%
     theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
           axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste('supps/key_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 16, height = 16)
+ggsave(paste('supps/key_all_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 13.5, height = 16)
 }
 ```
