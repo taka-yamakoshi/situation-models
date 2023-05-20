@@ -26,7 +26,7 @@ if __name__=='__main__':
     start = time.time()
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type = str, required = True)
-    parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande'])
+    parser.add_argument('--dataset', type = str, required = True, choices=['superglue','winogrande','combined'])
     parser.add_argument('--pair_id', type = str, required = True)
     parser.add_argument('--stimuli', type = str,
                         choices=['original','control_gender','control_number',
@@ -92,9 +92,9 @@ if __name__=='__main__':
         line = text[pair_ids.index(args.pair_id)]
         seq_len = calc_seq_len(head,line,tokenizer)
 
-        rep_types = ['layer-query-key-value','z_rep','z_rep','value']
-        cascade_types = [False,True,False,False]
-        multihead_types = [True,True,False,False]
+        rep_types = ['layer-query-key-value','z_rep','value']
+        cascade_types = [False,False,False]
+        multihead_types = [True,False,False]
         for rep,cascade_id,multihead_id in zip(rep_types, cascade_types, multihead_types):
             args.cascade, args.multihead = cascade_id, multihead_id
             for pos in range(seq_len):
