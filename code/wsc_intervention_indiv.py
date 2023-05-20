@@ -33,8 +33,8 @@ def calc_seq_len(head,line,args,tokenizer,mask_id):
                                 input_sent[0][option_2_start_id:option_2_end_id]]
         pron_start_id,pron_end_id = align_tokens(args,'pron',tokenizer,sent,input_sent,pron,pron_word_id)
         masked_sents = mask_out(args.model, mask_id, input_sent, pron_start_id, pron_end_id, option_tokens_list)
-        assert len(masked_sents[0])==len(masked_sents[1])
-        seq_len_list.append(len(masked_sents[0]))
+        assert len(masked_sents[0][0])==len(masked_sents[1][0])
+        seq_len_list.append(len(masked_sents[0][0]))
     assert seq_len_list[0]==seq_len_list[1]
     return seq_len_list[0]
 
