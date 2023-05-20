@@ -140,7 +140,7 @@ d.stats %>% filter(cue_type == 'verb')
 
 ```{r,results='hide'}
 d.layer.raw %>%
-  filter(original_1>0 & original_2>0 & original_1>original_2) %>%
+  filter(original_1>0 & original_2>0 & original_1<original_2) %>%
   filter(cue_type %in% c('context','verb')) %>%
   filter(pos_type %in% c('context','verb','options','masks','rest')) %>%
   #mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
@@ -163,7 +163,7 @@ d.layer.raw %>%
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=14), axis.title=element_text(size=18),
           strip.text=element_text(size=16), legend.text=element_text(size=16)) 
 
-ggsave('layerwise/layer_split_0_2_1.pdf', units = 'in', width = 9, height = 4)
+ggsave('layerwise/layer_split_0_1_2.pdf', units = 'in', width = 9, height = 4)
 ```
 
 ## Supplemental plot for periods and special tokens (S5)
@@ -181,7 +181,7 @@ d.layer.raw %>%
   group_by(cue_type, layer_id, pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
   ggplot(aes(x = layer_id, y = empirical_stat, color = pos_type, group = pos_type, linetype = pos_type, fill = pos_type)) +
-    geom_line(size=1.2) +
+    geom_line(linewidth=1.2) +
     geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     theme_few() +
     scale_fill_manual(values=c("#aeaeae","#1f1f1f")) +
@@ -235,8 +235,8 @@ d.zrep.raw <- read_csv(here('results/combined_effect_ave_z_rep_cascade_multihead
 ```{r}
 d.zrep <- d.zrep.raw %>%
   filter(pos_type %in% c('options', 'masks','rest')) %>%
-  mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
-  mutate(cue_type=factor(cue_type,levels=c('context','verb','context+verb'))) %>%
+  #mutate(cue_type = replace(cue_type,cue_type=='context_verb','context+verb')) %>%
+  mutate(cue_type=factor(cue_type,levels=c('context','verb'))) %>%
   mutate(pos_type=factor(pos_type,levels=c('options','masks','rest'))) %>%
   mutate(layer_id = layer_id+1) %>%
   calc_effect()
@@ -284,7 +284,7 @@ d.models %>%
   tidyboot_mean(effect_ave, nboot = 1000) %>%
   ggplot(aes(x = layer_id, y = empirical_stat, color = pos_type, group = pos_type, fill = pos_type)) +
     geom_hline(yintercept=0) +
-    geom_line(linewidth=1.2)) +
+    geom_line(linewidth=1.2) +
     geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
     theme_few() +
     scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
