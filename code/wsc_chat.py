@@ -15,6 +15,8 @@ from dotenv import dotenv_values
 from wsc_utils import load_dataset, load_model
 
 def calc_continuation(prompt):
+    system_input = f"You are a helpful assistant that can imagine a situation. "\
+                    +f"Given a sentence and two noun phrases, you will answer which noun phrase the pronoun refers to."
     pass_flag = False
     num_fails = 0
     while not pass_flag and num_fails<5:
@@ -22,7 +24,7 @@ def calc_continuation(prompt):
             response = openai.ChatCompletion.create(
                 model      = args.model,
                 messages   = [
-                        {"role": "system", "content": "You are a helpful assistant that can correctly answer which noun phrase a pronoun refers to based on the context."},
+                        {"role": "system", "content": system_input},
                         {"role": "user", "content": prompt}
                         ],
                 temperature = 1,
@@ -37,7 +39,7 @@ def calc_continuation(prompt):
 if __name__ == '__main__':
     start = time.time()
     parser = argparse.ArgumentParser()
-    parser.add_argument('--model', type = str, required = True, choices = ['gpt-4-0314','gpt-3.5-turbo-0301','text-davinci-003'])
+    parser.add_argument('--model', type = str, required = True, choices = ['gpt-4-0314','gpt-3.5-turbo-0301'])
     parser.add_argument('--dataset', type = str, choices=['combined'], default = 'combined')
     parser.add_argument('--stimuli', type = str, choices=['prompt'], default='prompt')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
@@ -64,16 +66,16 @@ if __name__ == '__main__':
     with open(f'{out_file_name}.csv', 'w') as f:
         writer = csv.writer(f)
         writer.writerow(head+['response','acc'])
-        for line in text[:10]:
+        for line in text:
             logprobs = {}
             sent = line[head.index('sentence')]
             query = line[head.index('query')]
             option_1 = line[head.index('responseA')]
             option_2 = line[head.index('responseB')]
-            correct = 'A' if line[head.index('1or2')]=='1' else 'B'
-            prompt = f"{sent} {query.replace('?',',')} A: {option_1} or B: {option_2}?"
+            #prompt = f"{sent} {query.replace('?',',')} A: {option_1} or B: {option_2}?"
+            prompt = f"{sent} {query}"
             print(prompt)
             response = calc_continuation(prompt)
-            writer.writerow(line+[response, correct in response])
+            writer.writerow(line+[response, option_1.lower() in response.lower()])
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
