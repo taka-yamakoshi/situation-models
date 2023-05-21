@@ -13,6 +13,27 @@ library(ggh4x)
 ```
 
 # fine-grained analyses
+```{r}
+calc_effect <- function(data) {
+  new_data <- data %>%
+  mutate(prob_1_1=exp(logprob_ave_option_1_sent_1),
+         prob_2_1=exp(logprob_ave_option_2_sent_1),
+         prob_1_2=exp(logprob_ave_option_1_sent_2),
+         prob_2_2=exp(logprob_ave_option_2_sent_2)) %>%
+  select(-c('original_1','original_2','interv_1','interv_2','effect_1','effect_2','effect_ave')) %>%
+  select(-c('logprob_ave_option_1_sent_1','logprob_ave_option_2_sent_1',
+            'logprob_ave_option_1_sent_2','logprob_ave_option_2_sent_2')) %>%
+  select(-c('logprob_sum_option_1_sent_1','logprob_sum_option_2_sent_1',
+            'logprob_sum_option_1_sent_2','logprob_sum_option_2_sent_2')) %>%
+  pivot_wider(names_from='interv_type',values_from=c('prob_1_1','prob_2_1','prob_1_2','prob_2_2')) %>%
+  mutate(effect_1_1=(prob_1_1_original-prob_1_1_interv), #/prob_1_1_original,
+         effect_2_1=(prob_2_1_interv-prob_2_1_original), #/prob_2_1_interv,
+         effect_1_2=(prob_1_2_interv-prob_1_2_original), #/prob_1_2_interv,
+         effect_2_2=(prob_2_2_original-prob_2_2_interv)) %>% #/prob_2_2_original) %>%
+  mutate(effect_ave = (effect_1_1+effect_2_1+effect_1_2+effect_2_2)/4)
+  return(new_data)
+}
+```
 
 ```{r,message=FALSE}
 # 24 is "Paul tried to call George on the phone, but he wasn't successful."
@@ -21,15 +42,28 @@ library(ggh4x)
 # 10 is "the journalists interviewed the stars of the new movie . [MASK] [MASK] were very persistent , so the interview lasted for a long time"
 example_id <- '24' 
 model_id <- 'albert-xxlarge-v2_layer_all_head_all'
-intervention <- 'superglue_original_verb_intervention' # 
-d.zindiv.raw <- str_glue('dataset/{intervention}_swap_indiv_{example_id}_{model_id}.csv') %>%
+intervention <- 'combined_original_intervention' #
+file.info(here(str_glue('results/{intervention}_swap_indiv_0-{example_id}_{model_id}.csv'))) $mtime
+d.zindiv.raw <- str_glue('results/{intervention}_swap_indiv_0-{example_id}_{model_id}.csv') %>%
   here() %>%
-  read_csv() 
+  read_csv() %>%
+  select(c('interv_type','rep','pos','cascade','multihead','layer_id','head_id',
+           'original_1','original_2','interv_1','interv_2','effect_1','effect_2','effect_ave',
+           'logprob_ave_option_1_sent_1','logprob_ave_option_2_sent_1',
+           'logprob_ave_option_1_sent_2','logprob_ave_option_2_sent_2',
+           'logprob_sum_option_1_sent_1','logprob_sum_option_2_sent_1',
+           'logprob_sum_option_1_sent_2','logprob_sum_option_2_sent_2'))
 
-intervention <- 'superglue_control_combined_verb_mask_context_intervention'
-d.zindiv.raw.verb <- str_glue('dataset/{intervention}_swap_indiv_{example_id}_{model_id}.csv') %>%
+intervention <- 'combined_control_mask_context_intervention'
+d.zindiv.raw.verb <- str_glue('results/{intervention}_swap_indiv_1-{example_id}_{model_id}.csv') %>%
   here() %>%
-  read_csv() #%>%
+  read_csv() %>%
+  select(c('interv_type','rep','pos','cascade','multihead','layer_id','head_id',
+           'original_1','original_2','interv_1','interv_2','effect_1','effect_2','effect_ave',
+           'logprob_ave_option_1_sent_1','logprob_ave_option_2_sent_1',
+           'logprob_ave_option_1_sent_2','logprob_ave_option_2_sent_2',
+           'logprob_sum_option_1_sent_1','logprob_sum_option_2_sent_1',
+           'logprob_sum_option_1_sent_2','logprob_sum_option_2_sent_2'))
 
   # mutate(original_2 = log(1/exp(original_2)),
   #       interv_2 = log(1/exp(interv_2))) %>%
@@ -40,9 +74,9 @@ d.zindiv.raw.verb <- str_glue('dataset/{intervention}_swap_indiv_{example_id}_{m
 ```
 
 ```{r}
-tokenized1_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'wasn', "'", 't', 'successful', '.')
-tokenized2_verb <- c('they', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'wasn', "'", 't', 'MASK', '.')
-tokenized2_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'he', 'wasn', "'", 't', 'available', '.')
+tokenized1_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'was', 'not', 'successful', '.')
+tokenized2_verb <- c('they', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'MASK', 'was', 'not', 'MASK', '.')
+tokenized2_context <- c('paul', 'tried', 'to', 'call', 'george', 'on', 'the', 'phone', ',', 'but', 'he', 'was', 'not', 'available', '.')
 # tokenized <- strsplit('sam took french classes from adam , because he was eager to speak it fluent ly .', split = ' ')[[1]]
 # tokenized <- strsplit('bob collapsed on the sidewalk . soon he saw carl coming to help . he was very ill .', split = ' ')[[1]]
 # tokenized <- strsplit('the journalists interviewed the stars of the new movie . [MASK] [MASK] were very cooperative , so the interview lasted for a long time .', split = ' ')[[1]]
@@ -53,74 +87,72 @@ Look at full cascade with multi-head layer-wise intervention
 
 ```{r}
 d.zindiv.raw %>% 
-  #filter(rep == 'layer-query-key-value') %>%
-  filter(rep == 'z_rep', cascade == T) %>%
-  filter(interv_type == 'interv') %>%
-  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
-  group_by(pos, layer_id) %>%
-  filter(head_id == 30) %>%
-  summarize(effect_ave = min(2, max(0, mean(effect_1)))) %>%
+  filter(rep == 'z_rep', cascade == T, head_id == 0) %>%
+  calc_effect() %>%
+  select(pos, layer_id, effect_ave)  %>%
   ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
     geom_tile() +
-    scale_fill_gradient(low = 'white', high = 'red') +
-    scale_color_gradient(low = 'white', high = 'red') +
+    scale_fill_gradient(low = 'white', high = 'red', limits=c(0.0,0.1), oob=scales::squish,breaks=c(0,0.05,0.1)) +
+    scale_color_gradient(low = 'white', high = 'red', limits=c(0.0,0.1), oob=scales::squish, breaks=c(0,0.05,0.1)) +
     scale_y_continuous(breaks = seq(length(tokenized1_context)), labels = rev(tokenized1_context)) +
-    #facet_wrap(~head_id) +
-    labs(x = '') +
+    scale_x_continuous(breaks = c(1,4,7,10)) +
+    labs(x = '', y = '') +
     theme_few() +
     theme(aspect.ratio = 3, legend.position = 'top', legend.key.width = unit(.5,"in"))
 
 ggsave(str_glue('sentence_{example_id}_zrep.pdf'), height = 4, width = 3, units = 'in')
-#ggsave(str_glue('sentence_{example_id}_heads.pdf'), height = 12, width = 12, units = 'in')
 ```
-
 
 ```{r}
 example_head <- 7
-
+for (rep_name in c('layer-query-key-value','z_rep','value')){
+  if (rep_name == 'layer-query-key-value'){
+    vmax <- 0.1
+  }else{
+    vmax <- 0.02
+  }
 d.zindiv.raw %>% 
-  #filter(rep == 'layer-query-key-value') %>%
-  filter(rep == 'value') %>%
-  #filter(rep == 'z_rep', cascade == F) %>%
-  filter(interv_type == 'interv') %>%
-  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
-  group_by(pos, layer_id) %>%
-  filter(head_id == example_head) %>%
+  filter(rep == rep_name, cascade == F, head_id == example_head) %>%
+  calc_effect() %>%
+  select(pos, layer_id, effect_ave)  %>%
   filter(pos > 0, pos <= length(tokenized1_context)) %>%
-  summarize(effect_ave = min(1, max(0, mean(effect_2)))) %>%
   ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
     geom_tile() +
-    scale_fill_gradient(low = 'white', high = 'red') +
-    scale_color_gradient(low = 'white', high = 'red') +
+    scale_fill_gradient(low = 'white', high = 'red',limits=c(0.0,vmax), oob=scales::squish,breaks=c(0,vmax/2,vmax)) +
+    scale_color_gradient(low = 'white', high = 'red',limits=c(0.0,vmax), oob=scales::squish,breaks=c(0,vmax/2,vmax)) +
     scale_y_continuous(breaks = seq(length(tokenized1_context)), labels = rev(tokenized1_context)) +
-    #facet_wrap(~head_id) +
+    scale_x_continuous(breaks = c(1,4,7,10)) +
     labs(x = '', y = '') +
     theme_few() +
     theme(aspect.ratio = 3, legend.key.height = unit(.5,"in"))
 
-ggsave(str_glue('sentence_{example_id}_head{example_head}_value.pdf'), height = 4, width = 3, units = 'in')
+ggsave(str_glue('sentence_{example_id}_head{example_head}_{rep_name}.pdf'), height = 4, width = 3, units = 'in')
+}
 ```
 
 ```{r}
-d.zindiv.raw.verb %>% 
-  #filter(rep == 'layer-query-key-value') %>%
-  #filter(rep == 'value') %>%
-  filter(rep == 'z_rep', cascade == F) %>%
-  filter(interv_type == 'interv') %>%
-  select(pos, layer_id, head_id, effect_1, effect_2, effect_ave)  %>% 
-  group_by(pos, layer_id) %>%
-  filter(head_id == example_head) %>%
+example_head <- 7
+for (rep_name in c('layer-query-key-value','z_rep','value')){
+  if (rep_name == 'layer-query-key-value'){
+    vmax <- 0.1
+  }else{
+    vmax <- 0.02
+  }
+d.zindiv.raw.verb %>%
+  filter(rep == rep_name, cascade == F, head_id == example_head) %>%
+  calc_effect() %>%
+  select(pos, layer_id, effect_ave)  %>%
   filter(pos > 0, pos <= length(tokenized1_context)) %>%
-  summarize(effect_ave = min(1, max(0, mean(effect_2)))) %>%
   ggplot(aes(x = layer_id, y = rev(pos), color = effect_ave, fill = effect_ave)) +
     geom_tile() +
-    scale_fill_gradient(low = 'white', high = 'red') +
-    scale_color_gradient(low = 'white', high = 'red') +
-    scale_y_continuous(breaks = seq(length(tokenized1_verb)), labels = rev(tokenized1_verb)) +
-    #facet_wrap(~head_id) +
-    labs(x = '') +
+    scale_fill_gradient(low = 'white', high = 'red',limits=c(0.0,vmax), oob=scales::squish,breaks=c(0,vmax/2,vmax)) +
+    scale_color_gradient(low = 'white', high = 'red',limits=c(0.0,vmax), oob=scales::squish,breaks=c(0,vmax/2,vmax)) +
+    scale_y_continuous(breaks = seq(length(tokenized2_verb)), labels = rev(tokenized2_verb)) +
+    scale_x_continuous(breaks = c(1,4,7,10)) +
+    labs(x = '', y = '') +
     theme_few() +
     theme(aspect.ratio = 3, legend.key.height = unit(.5,"in"))
 
-ggsave(str_glue('sentence_{example_id}_head{example_head}_zrep_verb.pdf'), height = 4, width = 3, units = 'in')
+ggsave(str_glue('sentence_{example_id}_head{example_head}_{rep_name}_verb.pdf'), height = 4, width = 3, units = 'in')
+}
 ```

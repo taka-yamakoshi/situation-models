@@ -80,7 +80,7 @@ d.val <- preprocess(d.val.raw) %>% calc_effect()
 # Count how many heads are involved in this circuit
 
 ```{r}
-p_threshold <- 0.05
+p_threshold <- 0.001
 head_list <- d.zindiv %>%
   filter(cue_type=="context") %>%
   group_by(layer_id, head_id, pos_type) %>%
@@ -170,7 +170,7 @@ tvals.raw <- d.zindiv %>%
               t.val = t.test(effect_ave)$statistic,
               effect = mean(effect_ave)) 
 
-threshold <- 0.01/64/12/3    
+threshold <- 0.05/64/12/3
 tvals.clean <- tvals.raw %>%
   select(layer_id,head_id,pos_type,p.val,cue_type, effect) %>%
   pivot_wider(names_from = c('cue_type'), values_from = c('p.val', 'effect')) %>%
@@ -231,17 +231,16 @@ t.vals.all <- d.headall %>%
   mutate(y = replace(y,pos_type==pos_type_list[4],bar_center-bar_height)) %>%
   mutate(y = replace(y,pos_type==pos_type_list[5],bar_center)) %>%
   mutate(alpha = 0) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.1/12/64/5),0.2)) %>%
   mutate(alpha = replace(alpha,p.log>-log10(0.05/12/64/5),0.4)) %>%
   mutate(alpha = replace(alpha,p.log>-log10(0.01/12/64/5),0.6)) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.005/12/64/5),0.8)) %>%
-  mutate(alpha = replace(alpha,p.log>-log10(0.001/12/64/5),1.0)) %>%
   select(cue_type,layer_id,head_id,rep_type,pos_type,y,alpha,p.val)
 write.csv(t.vals.all,file="tvals_all.csv",row.names=FALSE)
 ```
 
 ```{r}
 t.vals.all <- read_csv("tvals_all.csv")
-t.vals.all %>% head()
+t.vals.all
 ```
 
 ```{r}
@@ -278,7 +277,7 @@ for (plot_head_id in 1:64) {
       theme_few() +
       scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
       scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-      scale_alpha(limits = c(0.0, 1.0)) +
+      scale_alpha(limits = c(0.0, 0.6)) +
       ylim(-0.008,NA) + 
       labs(x = 'Layer', y ='Effect') +
       guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
