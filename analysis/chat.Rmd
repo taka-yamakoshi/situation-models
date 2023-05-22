@@ -1,0 +1,94 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Import dependencies
+
+```{r}
+library(tidyverse)
+library(here)
+library(ggthemes)
+library(tidyboot)
+```
+
+# Import data
+
+```{r,message=FALSE}
+d.chat <- 
+  #read_csv(here('results/chat/combined_prompt_prediction_gpt-3.5-turbo-0301.csv')) %>%
+  read_csv(here('results/chat/combined_prompt_prediction_gpt-4-0314.csv')) %>%
+  #read_csv(here('results/chat/2AFC/combined_prompt_prediction_gpt-4-0314.csv')) %>%
+  select(-c('email.name','response','full prompt (cut and paste)','full response')) %>%
+  rename(response = 'response_1')
+```
+
+```{r}
+d.chat %>% 
+  group_by(`item#`) %>%
+  summarize(acc=mean(acc)==1.0) %>%
+  summarize(acc=mean(acc))
+```
+```{r,message=FALSE}
+d.human.raw <- 
+  read_csv(here('results/chat/items.3afc.csv')) %>%
+  mutate(acc = item_mean > 0.5) %>%
+  drop_na(sentence) %>%
+  mutate(sentInit = str_sub(sentence,1,20))
+d.human.raw %>%
+  count(sentInit) %>%
+  filter(n==1) #%>%
+  #group_by(n) %>%
+  #summarize()
+d.human <- d.human.raw %>%
+  filter(sentInit != "The bouncy ball thro") %>%
+  group_by(sentInit) %>%
+  mutate(item_id = cur_group_id())
+item_list <- d.human %>% pull(item_id) %>% unique()
+length(item_list)
+```
+
+```{r}
+d.human %>% 
+  group_by(item_id) %>%
+  summarize(acc=mean(acc)==1.0) %>%
+  summarize(acc_count=sum(acc))
+```
+```{r}
+d.human.clean <- d.human %>%
+  select(sentInit,item_id,acc) %>%
+  group_by(sentInit) %>%
+  summarize(acc=mean(acc)==1.0) %>%
+  rename(acc.human = acc)
+d.chat.clean <- d.chat %>%
+  select(sentence,acc) %>%
+  mutate(sentInit = str_sub(sentence,1,20)) %>%
+  group_by(sentInit) %>%
+  summarize(acc=mean(acc)==1.0) %>%
+  rename(acc.chat = acc)
+d.combined <- inner_join(d.chat.clean,d.human.clean,by="sentInit")
+```
+
+```{r}
+d.combined %>%
+  select(-sentInit) %>%
+  table()
+```
+
+
+# Sandbox
+
+```{r,message=FALSE}
+d <- read_csv(here('results/chat/items2.afc.csv'))
+d %>%
+  mutate(sentInit = str_sub(sentence,1,15)) %>%
+  count(sentInit) %>%
+  filter(n==1)
+```
+
+```{r}
+d.chat %>%
+  mutate(options=str_c(responseA,responseB,sep='-')) %>%
+  count(options) %>%
+  filter(n>1)
+```
