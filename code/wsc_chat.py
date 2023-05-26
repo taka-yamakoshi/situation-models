@@ -19,7 +19,7 @@ def calc_continuation(prompt):
                     +f"Given a sentence and two noun phrases, you will answer which noun phrase the pronoun refers to."
     pass_flag = False
     num_fails = 0
-    while not pass_flag and num_fails<5:
+    while not pass_flag and num_fails<100:
         try:
             response = openai.ChatCompletion.create(
                 model      = args.model,
@@ -44,6 +44,7 @@ if __name__ == '__main__':
     parser.add_argument('--stimuli', type = str, choices=['prompt'], default='prompt')
     parser.add_argument('--size', type = str, choices=['xs','s','m','l','xl','debiased'])
     parser.add_argument('--core_id', type = int, default=0)
+    parser.add_argument('--num_samples', type = int, default=1)
     parser.add_argument('--mask_context',dest='mask_context',action='store_true')
     parser.add_argument('--no_mask',dest='no_mask',action='store_true')
     parser.set_defaults(mask_context=False,no_mask=False)
@@ -65,9 +66,8 @@ if __name__ == '__main__':
     os.makedirs(f'{os.environ.get("MY_DATA_PATH")}/chat/',exist_ok=True)
     with open(f'{out_file_name}.csv', 'w') as f:
         writer = csv.writer(f)
-        writer.writerow(head+['response','acc'])
+        writer.writerow(head+['sample_id','response','acc'])
         for line in text:
-            logprobs = {}
             sent = line[head.index('sentence')]
             query = line[head.index('query')]
             option_1 = line[head.index('responseA')]
@@ -75,7 +75,8 @@ if __name__ == '__main__':
             #prompt = f"{sent} {query.replace('?',',')} A: {option_1} or B: {option_2}?"
             prompt = f"{sent} {query}"
             print(prompt)
-            response = calc_continuation(prompt)
-            writer.writerow(line+[response, option_1.lower() in response.lower()])
+            for sample_id in range(args.num_samples):
+                response = calc_continuation(prompt)
+                writer.writerow(line+[sample_id, response, option_1.lower() in response.lower()])
     print(f'{len(text)} sentences done')
     print(f'Time: {time.time()-start}')
