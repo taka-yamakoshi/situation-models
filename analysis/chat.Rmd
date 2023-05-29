@@ -15,19 +15,32 @@ library(tidyboot)
 # Import data
 
 ```{r,message=FALSE}
+d.chat0 <- read_csv(here('results/chat/combined_prompt_prediction_gpt-4-0314_0.csv'))
+d.chat1 <- read_csv(here('results/chat/combined_prompt_prediction_gpt-4-0314_1.csv')) %>%
+  mutate(sample_id = sample_id + 20)
+d.chat.all <- bind_rows(d.chat0,d.chat1) %>%
+  select(-c('email.name','response','full prompt (cut and paste)','full response')) %>%
+  rename(response = 'response_1') %>%
+  arrange(X)
+write.csv(d.chat.all,file=here('results/chat/combined_prompt_prediction_gpt-4-0314.csv'),row.names=FALSE)
+```
+
+```{r,message=FALSE}
 d.chat <- 
   #read_csv(here('results/chat/combined_prompt_prediction_gpt-3.5-turbo-0301.csv')) %>%
-  read_csv(here('results/chat/combined_prompt_prediction_gpt-4-0314.csv')) %>%
+  read_csv(here('results/chat/combined_prompt_prediction_gpt-4-0314.csv')) #%>%
   #read_csv(here('results/chat/2AFC/combined_prompt_prediction_gpt-4-0314.csv')) %>%
-  select(-c('email.name','response','full prompt (cut and paste)','full response')) %>%
-  rename(response = 'response_1')
+  #select(-c('email.name','response','full prompt (cut and paste)','full response')) %>%
+  #rename(response = 'response_1')
 ```
 
 ```{r}
 d.chat %>% 
+  group_by(X,`item#`) %>%
+  summarize(agg = mean(acc)>0.5) %>%
   group_by(`item#`) %>%
-  summarize(acc=mean(acc)==1.0) %>%
-  summarize(acc=mean(acc))
+  summarize(acc_agg=mean(agg)==1.0) %>%
+  summarize(acc_all=mean(acc_agg))
 ```
 ```{r,message=FALSE}
 d.human.raw <- 
