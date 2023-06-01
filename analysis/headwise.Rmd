@@ -37,7 +37,7 @@ d.zindiv.raw %>%
   mutate(acc = original_1>original_2) %>%
   #mutate(acc = original_1> 0 & original_2<0) %>%
   group_by(cue_type) %>%
-  summarize(perf = mean(acc), num = sum(acc), total = sum(acc>-1))
+  summarize(ratio = mean(acc), num = sum(acc), total = sum(acc>-1))
 ```
 
 ```{r}
@@ -56,6 +56,7 @@ sent_list <- d.zindiv.raw %>%
 ```{r}
 preprocess <- function(d) {
   d %>%
+    select(-c("sent_1","sent_2")) %>%
     separate(pair_id, into = c('prefix', 'pair_id')) %>%
     filter(pair_id %in% sent_list) %>%
     mutate(layer_id=layer_id+1) %>%
@@ -128,50 +129,13 @@ d.headall %>% head()
 can take a while when nboot is big
 
 ```{r,message=FALSE}
-d.head_all.boot <- d.headall %>%
+d.headall.boot <- d.headall %>%
   group_by(cue_type,layer_id,head_id,rep_type,pos_type) %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
   rename(y=empirical_stat)
-write.csv(d.head_all.boot,file=str_glue("headall_boot_{model_name}.csv"),row.names=FALSE)
-d.head_all.boot <- read_csv(str_glue("headall_boot_{model_name}.csv"))
+write.csv(d.headall.boot,file=str_glue("headall_boot_{model_name}.csv"),row.names=FALSE)
+d.headall.boot <- read_csv(str_glue("headall_boot_{model_name}.csv"))
 ```
-
-Examine effects at specific heads
-
-```{r}
-t.vals.all <- d.headall %>%
-  filter(cue_type == 'context') %>%
-  group_by(cue_type, layer_id, head_id, rep_type, pos_type) %>%
-  summarize(p.val = t.test(effect_ave)$p.value,
-            t.val = t.test(effect_ave)$statistic)
-
-# Head 11
-t.vals.all %>%
-  filter(p.val < 0.000001) %>%
-  filter(head_id %in% c(11)) 
- 
-# Head 8
-t.vals.all %>%
-  filter(p.val < 0.000001) %>%
-  filter(head_id %in% c(8), layer_id %in% c(9, 10))
-   
-# Head 45
-t.vals.all %>%
-  filter(p.val < 0.000001) %>%
-  filter(head_id %in% c(45))
-
-# Head 53
-t.vals.all %>%
-  filter(p.val < 0.000001) %>%
-  filter(head_id %in% c(53))
-
-# Head 60
-t.vals.all %>%
-  filter(p.val < 0.000001) %>%
-  filter(head_id %in% c(60))
-```
-
-
 
 # Comparing verb vs context
 
@@ -256,7 +220,6 @@ write.csv(t.vals.all,file=str_glue("tvals_all_{model_name}.csv"),row.names=FALSE
 
 ```{r,message=FALSE}
 t.vals.all <- read_csv(str_glue("tvals_all_{model_name}.csv"))
-t.vals.all
 ```
 
 ```{r}
@@ -274,7 +237,6 @@ if (model_name=="albert-xxlarge-v2") {
   num_heads = 16
 }
 for (plot_head_id in 1:num_heads) {
-#for (plot_head_id in c(3,8,11,16,17,21,23,24,26,28,29,35,37,40,42,45,46,48,50,51,53,55,56,58,60)) {
   for (plot_cue_type in c("context","verb")) {
     d.head <- d.headall.plot %>% 
       filter(cue_type==plot_cue_type) %>%
@@ -316,19 +278,111 @@ for (plot_head_id in 1:num_heads) {
 ```
 
 ```{r}
-show_cue_type <- "context"
-show_head_id <- 44
-show_pos_type <- "context"
-show_rep_type <- "key"
-t.vals.all %>% filter((cue_type==show_cue_type)&(head_id==show_head_id)&(pos_type==show_pos_type)&(rep_type==show_rep_type))
+d.headall.max <- d.headall %>%
+    filter(pos_type%in%pos_type_list) %>%
+    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
+    group_by(cue_type, rep_type, pos_type, layer_id, head_id) %>%
+    mutate(mean_val = mean(effect_ave)) %>%
+    group_by(cue_type, rep_type, pos_type, layer_id, pair_id) %>%
+    slice(which.max(mean_val))
+```
+
+```{r,message=FALSE}
+d.headall.max.boot <- d.headall.max %>%
+  group_by(cue_type,rep_type,pos_type,layer_id) %>%
+  tidyboot_mean(effect_ave, nboot = 10) %>%
+  rename(y=empirical_stat)
+write.csv(d.head_all.boot,file=str_glue("headall_max_boot_{model_name}.csv"),row.names=FALSE)
+d.head_all.boot <- read_csv(str_glue("headall_max_boot_{model_name}.csv"))
 ```
 
 ```{r}
-show_cue_type <- "context"
-show_head_id <- 44
-show_pos_type <- "context"
-show_rep_type <- "key"
-d.head_all.boot %>% filter((cue_type==show_cue_type)&(head_id==show_head_id)&(pos_type==show_pos_type)&(rep_type==show_rep_type))
+bar_center <- -0.01
+bar_height <- 0.02
+t.vals.max.all <- d.headall.max %>%
+  group_by(cue_type, rep_type, pos_type, layer_id) %>%
+  summarize(p.val = t.test(effect_ave)$p.value,
+            t.val = t.test(effect_ave)$statistic) %>%
+  mutate(p.log=(-log10(p.val))) %>%
+  mutate(y = 0) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[1],bar_center-4*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[2],bar_center-3*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[3],bar_center-2*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[4],bar_center-bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[5],bar_center)) %>%
+  mutate(alpha = 0) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.05/12/64/5),0.2)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.01/12/64/5),0.4)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.005/12/64/5),0.6)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.001/12/64/5),0.8)) %>%
+  select(cue_type,layer_id,rep_type,pos_type,y,alpha,p.val)
+write.csv(t.vals.max.all,file=str_glue("tvals_all_max_{model_name}.csv"),row.names=FALSE)
+```
+
+```{r}
+d.headall.max.plot <- bind_rows(d.headall.max.boot %>% 
+                              select(cue_type,layer_id,rep_type,pos_type,y,ci_lower,ci_upper) %>%
+                              mutate(plot_type='line'),
+                            t.vals.max.all %>%
+                              mutate(plot_type='tile'))
+```
+
+```{r}
+for (plot_cue_type in c("context","verb")) {
+    d.head <- d.headall.max.plot %>% 
+      filter(cue_type==plot_cue_type) %>%
+      mutate(rep_type=factor(rep_type,levels=c('transformation','key','value'))) %>%
+      mutate(plot_type=factor(plot_type,levels=c('tile','line'))) %>%
+      mutate(pos_type=factor(pos_type,levels=pos_type_list))
+    
+    d.head %>%
+      ggplot(aes(x=as.factor(layer_id), y=y, group=pos_type)) +
+      geom_hline(yintercept=0) +
+      geom_tile(data = subset(d.head, plot_type == 'tile'),
+                height=bar_height,width=1,
+                #aes(alpha=alpha,color="white",fill=pos_type)) +
+                aes(alpha=alpha,fill=pos_type)) +
+      geom_line(data = subset(d.head, plot_type == 'line'),
+                aes(color=pos_type),linewidth=1.2) +
+      geom_ribbon(data = subset(d.head, plot_type == 'line'),
+                    aes(ymin=ci_lower, ymax=ci_upper, fill=pos_type),alpha = 0.2, color=NA,) +
+      theme_few() +
+      scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      #scale_x_continuous(breaks = c(1,3,5,7,9,11,13,15,17,19,21,23)) +
+      scale_alpha(limits = c(0.0, 0.8)) +
+      ylim(-0.1,NA) + 
+      labs(x = 'Layer', y ='Effect') +
+      guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
+      facet_grid(plot_type~rep_type,scales = "free_y") +
+      force_panelsizes(rows = c(unit(0.6,"in"), unit(3.0,"in")),
+                       cols = c(unit(2.5,"in"),unit(2.5,"in"), unit(2.5,"in"))) +
+      theme(legend.position = 'top', legend.title = element_blank(), legend.box="vertical",
+            axis.text.x=element_text(size=10), axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+            strip.text.x=element_text(size=16), legend.text=element_text(size=16), strip.text.y=element_blank(),
+            axis.line = element_line(colour = "black"),
+            panel.border = element_blank(),panel.background = element_blank())
+    ggsave(str_glue('{model_name}-{plot_cue_type}.pdf',sep=""), units = 'in', width = 7.5, height = 3.6)
+}
+```
+
+```{r}
+d.headall.max.stats <- d.headall.max %>%
+  select(cue_type, rep_type, pos_type, layer_id, pair_id, effect_ave) %>%
+  pivot_wider(names_from = pos_type, values_from = effect_ave) %>%
+  group_by(cue_type, rep_type, layer_id) %>%
+  summarize(options_p.val = t.test(options)$p.value,
+            options_df = t.test(options)$parameter,
+            options_stat = t.test(options)$statistic,
+            mask_option_diff_p.val = t.test(masks, options, paired = T)$p.value,
+            mask_option_diff_stat = t.test(masks, options, paired = T)$statistic,
+            context_p.val = t.test(context)$p.value,
+            verb_p.val = t.test(verb)$p.value,
+            masks_p.val = t.test(masks)$p.value,
+            rest_p.val = t.test(rest)$p.value)
+```
+```{r}
+d.headall.max.stats %>% filter()
 ```
 
 # 1.4.1: z rep
@@ -431,37 +485,6 @@ d.zindiv %>%
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_blank(), legend.text=element_text(size=16))
 ggsave(paste0('supps/',model_name,'/zrep_all_agg_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
-}
-```
-
-
-```{r}
-pos_type_list <- c('context','verb','options','masks','rest')
-for (plot_cue_type in c("context","verb")) {
-d.zindiv %>%
-    filter(pos_type%in%pos_type_list) %>%
-    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
-    filter(cue_type==plot_cue_type) %>%
-    group_by(layer_id, head_id, pos_type) %>%
-    tidyboot_mean(effect_ave, nboot = 10) %>%
-    group_by(layer_id, pos_type) %>%
-    summarize(value = max(empirical_stat)) %>%
-    ggplot(aes(x = layer_id, y = pos_type, height = value, color = pos_type, group = pos_type, fill=pos_type)) +
-    #geom_hline(yintercept=0) +
-    #geom_line(linewidth=0.8) + 
-    geom_ridgeline() +
-    #geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
-    scale_x_continuous(breaks = c(1,5,9,13,17,21)) +
-    scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
-    #facet_grid(pos_type ~ layer_id, scales = "free_y") +
-    theme_few() +
-    labs(x = 'Layer', y ='Effect') +
-    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
-          axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
-          strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste0('supps/',model_name,'/zrep_all_agg_ridge_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
 }
 ```
 
@@ -579,37 +602,6 @@ ggsave(paste0('supps/',model_name,'/value_all_agg_',plot_cue_type,'.pdf',sep="")
 }
 ```
 
-
-```{r}
-pos_type_list <- c('context','verb','options','masks','rest')
-for (plot_cue_type in c("context","verb")) {
-d.val %>%
-    filter(pos_type%in%pos_type_list) %>%
-    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
-    filter(cue_type==plot_cue_type) %>%
-    group_by(layer_id, head_id, pos_type) %>%
-    tidyboot_mean(effect_ave, nboot = 10) %>%
-    group_by(layer_id, pos_type) %>%
-    summarize(value = max(empirical_stat)) %>%
-    ggplot(aes(x = layer_id, y = pos_type, height = value, color = pos_type, group = pos_type, fill=pos_type)) +
-    #geom_hline(yintercept=0) +
-    #geom_line(linewidth=0.8) + 
-    geom_ridgeline() +
-    #geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
-    scale_x_continuous(breaks = c(1,5,9,13,17,21)) +
-    scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
-    #facet_grid(pos_type ~ layer_id, scales = "free_y") +
-    theme_few() +
-    labs(x = 'Layer', y ='Effect') +
-    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
-          axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
-          strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste0('supps/',model_name,'/value_all_agg_ridge_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
-}
-```
-
 # Query
 ```{r}
 pos_type_list <- c('context','verb','options','masks','rest')
@@ -716,37 +708,6 @@ ggsave(paste0('supps/',model_name,'/query_all_agg_',plot_cue_type,'.pdf',sep="")
 }
 ```
 
-
-```{r}
-pos_type_list <- c('context','verb','options','masks','rest')
-for (plot_cue_type in c("context","verb")) {
-d.qry %>%
-    filter(pos_type%in%pos_type_list) %>%
-    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
-    filter(cue_type==plot_cue_type) %>%
-    group_by(layer_id, head_id, pos_type) %>%
-    tidyboot_mean(effect_ave, nboot = 10) %>%
-    group_by(layer_id, pos_type) %>%
-    summarize(value = max(empirical_stat)) %>%
-    ggplot(aes(x = layer_id, y = pos_type, height = value, color = pos_type, group = pos_type, fill=pos_type)) +
-    #geom_hline(yintercept=0) +
-    #geom_line(linewidth=0.8) + 
-    geom_ridgeline() +
-    #geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
-    scale_x_continuous(breaks = c(1,5,9,13,17,21)) +
-    scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
-    #facet_grid(pos_type ~ layer_id, scales = "free_y") +
-    theme_few() +
-    labs(x = 'Layer', y ='Effect') +
-    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
-          axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
-          strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste0('supps/',model_name,'/query_all_agg_ridge_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
-}
-```
-
 # Key
 ```{r}
 pos_type_list <- c('context','verb','options','masks','rest')
@@ -850,36 +811,5 @@ d.key %>%
           axis.text.x=element_text(size=10),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
           strip.text=element_blank(), legend.text=element_text(size=16))
 ggsave(paste0('supps/',model_name,'/key_all_agg_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
-}
-```
-
-
-```{r}
-pos_type_list <- c('context','verb','options','masks','rest')
-for (plot_cue_type in c("context","verb")) {
-d.key %>%
-    filter(pos_type%in%pos_type_list) %>%
-    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
-    filter(cue_type==plot_cue_type) %>%
-    group_by(layer_id, head_id, pos_type) %>%
-    tidyboot_mean(effect_ave, nboot = 10) %>%
-    group_by(layer_id, pos_type) %>%
-    summarize(value = max(empirical_stat)) %>%
-    ggplot(aes(x = layer_id, y = pos_type, height = value, color = pos_type, group = pos_type, fill=pos_type)) +
-    #geom_hline(yintercept=0) +
-    #geom_line(linewidth=0.8) + 
-    geom_ridgeline() +
-    #geom_ribbon(aes(ymin=ci_lower, ymax=ci_upper), alpha = 0.2, color=NA,) +
-    scale_x_continuous(breaks = c(1,5,9,13,17,21)) +
-    scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
-    #"#000000" "#E69F00" "#56B4E9" "#009E73" "#F0E442" "#0072B2" "#D55E00" "#CC79A7"
-    #facet_grid(pos_type ~ layer_id, scales = "free_y") +
-    theme_few() +
-    labs(x = 'Layer', y ='Effect') +
-    theme(aspect.ratio = 1,legend.position = 'top', legend.title = element_blank(), 
-          axis.text.x=element_text(size=7),axis.text.y=element_text(size=10), axis.title=element_text(size=16),
-          strip.text=element_text(size=10), legend.text=element_text(size=16))
-ggsave(paste0('supps/',model_name,'/key_all_agg_ridge_',plot_cue_type,'.pdf',sep=""), units = 'in', width = 6, height = 6)
 }
 ```
