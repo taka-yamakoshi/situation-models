@@ -134,7 +134,7 @@ d.headall.boot <- d.headall %>%
   tidyboot_mean(effect_ave, nboot = 10) %>%
   rename(y=empirical_stat)
 write.csv(d.headall.boot,file=str_glue("headall_boot_{model_name}.csv"),row.names=FALSE)
-d.headall.boot <- read_csv(str_glue("headall_boot_{model_name}.csv"))
+#d.headall.boot <- read_csv(str_glue("headall_boot_{model_name}.csv"))
 ```
 
 # Comparing verb vs context
@@ -223,7 +223,7 @@ t.vals.all <- read_csv(str_glue("tvals_all_{model_name}.csv"))
 ```
 
 ```{r}
-d.headall.plot <- bind_rows(d.head_all.boot %>% 
+d.headall.plot <- bind_rows(d.headall.boot %>% 
                               select(cue_type,layer_id,head_id,rep_type,pos_type,y,ci_lower,ci_upper) %>%
                               mutate(plot_type='line'),
                             t.vals.all %>%
@@ -290,10 +290,10 @@ d.headall.max <- d.headall %>%
 ```{r,message=FALSE}
 d.headall.max.boot <- d.headall.max %>%
   group_by(cue_type,rep_type,pos_type,layer_id) %>%
-  tidyboot_mean(effect_ave, nboot = 10) %>%
+  tidyboot_mean(effect_ave, nboot = 100) %>%
   rename(y=empirical_stat)
-write.csv(d.head_all.boot,file=str_glue("headall_max_boot_{model_name}.csv"),row.names=FALSE)
-d.head_all.boot <- read_csv(str_glue("headall_max_boot_{model_name}.csv"))
+write.csv(d.headall.max.boot,file=str_glue("headall_max_boot_{model_name}.csv"),row.names=FALSE)
+#d.headall.max.boot <- read_csv(str_glue("headall_max_boot_{model_name}.csv"))
 ```
 
 ```{r}
@@ -383,6 +383,95 @@ d.headall.max.stats <- d.headall.max %>%
 ```
 ```{r}
 d.headall.max.stats %>% filter()
+```
+
+```{r}
+d.headall.tmax <- d.headall %>%
+    filter(pos_type%in%pos_type_list) %>%
+    mutate(pos_type=factor(pos_type,levels=pos_type_list)) %>%
+    group_by(cue_type, rep_type, pos_type, layer_id, head_id) %>%
+    mutate(t.val = t.test(effect_ave)$statistic) %>%
+    group_by(cue_type, rep_type, pos_type, layer_id, pair_id) %>%
+    slice(which.max(t.val))
+```
+
+```{r,message=FALSE}
+d.headall.tmax.boot <- d.headall.tmax %>%
+  group_by(cue_type,rep_type,pos_type,layer_id) %>%
+  tidyboot_mean(effect_ave, nboot = 100) %>%
+  rename(y=empirical_stat)
+write.csv(d.headall.tmax.boot,file=str_glue("headall_tmax_boot_{model_name}.csv"),row.names=FALSE)
+#d.headall.max.boot <- read_csv(str_glue("headall_max_boot_{model_name}.csv"))
+```
+
+```{r}
+bar_center <- -0.01
+bar_height <- 0.02
+t.vals.tmax.all <- d.headall.tmax %>%
+  group_by(cue_type, rep_type, pos_type, layer_id) %>%
+  summarize(p.val = t.test(effect_ave)$p.value,
+            t.val = t.test(effect_ave)$statistic) %>%
+  mutate(p.log=(-log10(p.val))) %>%
+  mutate(y = 0) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[1],bar_center-4*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[2],bar_center-3*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[3],bar_center-2*bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[4],bar_center-bar_height)) %>%
+  mutate(y = replace(y,pos_type==pos_type_list[5],bar_center)) %>%
+  mutate(alpha = 0) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.05/12/64/5),0.2)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.01/12/64/5),0.4)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.005/12/64/5),0.6)) %>%
+  mutate(alpha = replace(alpha,p.log>-log10(0.001/12/64/5),0.8)) %>%
+  select(cue_type,layer_id,rep_type,pos_type,y,alpha,p.val)
+write.csv(t.vals.tmax.all,file=str_glue("tvals_all_tmax_{model_name}.csv"),row.names=FALSE)
+```
+
+```{r}
+d.headall.tmax.plot <- bind_rows(d.headall.tmax.boot %>% 
+                              select(cue_type,layer_id,rep_type,pos_type,y,ci_lower,ci_upper) %>%
+                              mutate(plot_type='line'),
+                            t.vals.tmax.all %>%
+                              mutate(plot_type='tile'))
+```
+
+```{r}
+for (plot_cue_type in c("context","verb")) {
+    d.head <- d.headall.tmax.plot %>% 
+      filter(cue_type==plot_cue_type) %>%
+      mutate(rep_type=factor(rep_type,levels=c('transformation','key','value'))) %>%
+      mutate(plot_type=factor(plot_type,levels=c('tile','line'))) %>%
+      mutate(pos_type=factor(pos_type,levels=pos_type_list))
+    
+    d.head %>%
+      ggplot(aes(x=as.factor(layer_id), y=y, group=pos_type)) +
+      geom_hline(yintercept=0) +
+      geom_tile(data = subset(d.head, plot_type == 'tile'),
+                height=bar_height,width=1,
+                #aes(alpha=alpha,color="white",fill=pos_type)) +
+                aes(alpha=alpha,fill=pos_type)) +
+      geom_line(data = subset(d.head, plot_type == 'line'),
+                aes(color=pos_type),linewidth=1.2) +
+      geom_ribbon(data = subset(d.head, plot_type == 'line'),
+                    aes(ymin=ci_lower, ymax=ci_upper, fill=pos_type),alpha = 0.2, color=NA,) +
+      theme_few() +
+      scale_color_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      scale_fill_manual(values=c("#E69F00","#D55E00","#56B4E9","#009E73","#000000")) +
+      #scale_x_continuous(breaks = c(1,3,5,7,9,11,13,15,17,19,21,23)) +
+      scale_alpha(limits = c(0.0, 0.8)) +
+      ylim(-0.1,NA) + 
+      labs(x = 'Layer', y ='Effect') +
+      guides(color=FALSE,alpha=FALSE,fill=guide_legend(ncol=5,order=1)) +
+      facet_grid(plot_type~rep_type,scales = "free_y") +
+      force_panelsizes(rows = c(unit(0.3,"in"), unit(1.5,"in")),
+                       cols = c(unit(3,"in"),unit(3,"in"), unit(3,"in"))) +
+      theme(legend.position = 'top', legend.title = element_blank(), legend.box="vertical",aspect.ratio = 0.5,
+            axis.text.x=element_text(size=10), axis.text.y=element_text(size=14), axis.title=element_text(size=18),
+            strip.text.x=element_text(size=16), legend.text=element_text(size=16), strip.text.y=element_blank(),
+            axis.line = element_line(colour = "black"),
+            panel.border = element_blank(),panel.background = element_blank())
+    ggsave(str_glue('{model_name}-{plot_cue_type}-tmax.pdf',sep=""), units = 'in', width = 12, height = 4.4)
+}
 ```
 
 # 1.4.1: z rep
