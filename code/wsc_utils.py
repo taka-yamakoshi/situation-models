@@ -31,11 +31,12 @@ def load_dataset(args):
     elif args.dataset=='combined':
         fname = f'../dataset/combined/{args.stimuli}.csv'
 
-    with open(fname,'r') as f:
+    with open(fname,mode='r',encoding='utf-8-sig') as f:
         reader = csv.reader(f)
         file = [row for row in reader]
     head = file[0]
     text = file[1:]
+    print(head)
     return head,text
 
 def load_model(args):
